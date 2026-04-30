@@ -1,7 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FaceDetector } from 'face-detection-module';
-
-// ─── helpers ─────────────────────────────────────────────────────────────────
 const fmt = (d) => d.toLocaleTimeString();
 const fmtDate = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const elapsed = (ms) => {
@@ -14,12 +12,6 @@ const elapsed = (ms) => {
   return `${s}s`;
 };
 const pct = (a, b) => (b === 0 ? 0 : Math.round((a / b) * 100));
-
-// ─── away-event kinds ─────────────────────────────────────────────────────────
-// kind: 'tab'       → switched to another browser tab (visibilitychange hidden)
-// kind: 'minimize'  → window blurred while tab is still visible (minimize / alt-tab to another app)
-// Each away event: { id, kind, label, startTime, endTime|null, durationMs|null }
-
 let _evId = 0;
 const newAwayEvent = (kind, label) => ({
   id: ++_evId, kind, label,
@@ -28,25 +20,21 @@ const newAwayEvent = (kind, label) => ({
 
 export default function FaceDetection() {
   const [isDetecting, setIsDetecting] = useState(false);
-  const [logs, setLogs]               = useState([]);
-  const [status, setStatus]           = useState('Idle');
+  const [logs, setLogs] = useState([]);
+  const [status, setStatus] = useState('Idle');
   const [sessionData, setSessionData] = useState(null);
-  const [report, setReport]           = useState(null);
-  const [, forceRender]               = useState(0);
+  const [report, setReport] = useState(null);
+  const [, forceRender] = useState(0);
 
-  const sessionRef   = useRef(null);
-  // completed away events (have endTime)
-  const awayEvents   = useRef([]);
-  // currently open away event (null if focused)
-  const openEvent    = useRef(null);
-  const tickRef      = useRef(null);
+  const sessionRef = useRef(null);
+  const awayEvents = useRef([]);
+  const openEvent = useRef(null);
+  const tickRef = useRef(null);
 
   const addLog = useCallback((message, type = 'info') => {
     const time = new Date().toLocaleTimeString();
     setLogs(prev => [{ time, message, type }, ...prev].slice(0, 12));
   }, []);
-
-  // tick every second for live stats
   useEffect(() => {
     if (isDetecting) {
       tickRef.current = setInterval(() => forceRender(n => n + 1), 1000);
@@ -56,25 +44,23 @@ export default function FaceDetection() {
     return () => clearInterval(tickRef.current);
   }, [isDetecting]);
 
-  // ── away tracking ─────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isDetecting) return;
 
-    // open a new away event
+
     const goAway = (kind, label) => {
-      // if already away, don't double-open
+
       if (openEvent.current) return;
       const ev = newAwayEvent(kind, label);
       openEvent.current = ev;
       if (sessionRef.current) sessionRef.current.tabSwitches += 1;
       addLog(`🔴 ${label}`, 'warn');
     };
-
-    // close the current away event
     const comeBack = (returnLabel) => {
       if (!openEvent.current) return;
       const ev = openEvent.current;
-      ev.endTime   = new Date();
+      ev.endTime = new Date();
       ev.durationMs = ev.endTime - ev.startTime;
       awayEvents.current.push({ ...ev });
       openEvent.current = null;
@@ -82,7 +68,7 @@ export default function FaceDetection() {
       addLog(`🟢 ${returnLabel} (away ${elapsed(ev.durationMs)})`, 'info');
     };
 
-    // visibilitychange → tab switch or minimize via browser
+
     const onVisChange = () => {
       if (document.hidden) {
         goAway('tab', `Tab hidden — "${document.title}"`);
@@ -90,10 +76,6 @@ export default function FaceDetection() {
         comeBack('Tab visible again');
       }
     };
-
-    // blur fires when: window minimized, alt-tab to another app, or new tab opened
-    // We only want to act on blur when the page is still visible (i.e. not a tab switch,
-    // which is already handled by visibilitychange)
     const onBlur = () => {
       if (!document.hidden) {
         goAway('minimize', 'Window minimized / app switched');
@@ -116,7 +98,6 @@ export default function FaceDetection() {
     };
   }, [isDetecting, addLog]);
 
-  // ── face callbacks ────────────────────────────────────────────────────────
   const handleFaceDetected = useCallback((detections) => {
     setStatus('Face Detected');
     if (sessionRef.current) sessionRef.current.faceFrames += 1;
@@ -127,8 +108,6 @@ export default function FaceDetection() {
     if (sessionRef.current) sessionRef.current.noFaceAlerts += 1;
     addLog('⚠️ No face detected!', 'error');
   }, [addLog]);
-
-  // ── start / stop ──────────────────────────────────────────────────────────
   const startSession = () => {
     const now = new Date();
     sessionRef.current = {
@@ -139,7 +118,7 @@ export default function FaceDetection() {
       totalAwayMs: 0,
     };
     awayEvents.current = [];
-    openEvent.current  = null;
+    openEvent.current = null;
     setSessionData({ startTime: now });
     setReport(null);
     setStatus('Initializing...');
@@ -151,32 +130,30 @@ export default function FaceDetection() {
     const now = new Date();
     const s = sessionRef.current;
     if (!s) return;
-
-    // close any open away event
     if (openEvent.current) {
       const ev = openEvent.current;
-      ev.endTime    = now;
+      ev.endTime = now;
       ev.durationMs = now - ev.startTime;
       awayEvents.current.push({ ...ev });
       s.totalAwayMs += ev.durationMs;
       openEvent.current = null;
     }
 
-    const totalMs      = now - s.startTime;
-    const focusedMs    = Math.max(0, totalMs - s.totalAwayMs);
+    const totalMs = now - s.startTime;
+    const focusedMs = Math.max(0, totalMs - s.totalAwayMs);
     const attentionPct = pct(s.faceFrames, s.faceFrames + s.noFaceAlerts);
 
     setReport({
-      date:             fmtDate(s.startTime),
-      startTime:        fmt(s.startTime),
-      endTime:          fmt(now),
-      totalDuration:    elapsed(totalMs),
-      focusedTime:      elapsed(focusedMs),
-      awayTime:         elapsed(s.totalAwayMs),
+      date: fmtDate(s.startTime),
+      startTime: fmt(s.startTime),
+      endTime: fmt(now),
+      totalDuration: elapsed(totalMs),
+      focusedTime: elapsed(focusedMs),
+      awayTime: elapsed(s.totalAwayMs),
       attentionPercent: attentionPct,
-      noFaceAlerts:     s.noFaceAlerts,
-      tabSwitches:      s.tabSwitches,
-      awayEvents:       [...awayEvents.current],
+      noFaceAlerts: s.noFaceAlerts,
+      tabSwitches: s.tabSwitches,
+      awayEvents: [...awayEvents.current],
       grade: attentionPct >= 85 ? 'Excellent' : attentionPct >= 65 ? 'Good' : attentionPct >= 40 ? 'Fair' : 'Needs Improvement',
     });
 
@@ -186,24 +163,22 @@ export default function FaceDetection() {
     addLog('Session ended', 'info');
     setIsDetecting(false);
   };
-
-  // ── live stats ────────────────────────────────────────────────────────────
   const liveStats = (() => {
     const s = sessionRef.current;
     if (!s) return null;
-    const now      = new Date();
-    const totalMs  = now - s.startTime;
+    const now = new Date();
+    const totalMs = now - s.startTime;
     const liveAway = openEvent.current ? now - openEvent.current.startTime : 0;
-    const awayMs   = s.totalAwayMs + liveAway;
+    const awayMs = s.totalAwayMs + liveAway;
     return {
-      duration:      elapsed(totalMs),
-      attentionPct:  pct(s.faceFrames, s.faceFrames + s.noFaceAlerts),
-      tabSwitches:   s.tabSwitches,
-      noFaceAlerts:  s.noFaceAlerts,
-      awayTime:      elapsed(awayMs),
+      duration: elapsed(totalMs),
+      attentionPct: pct(s.faceFrames, s.faceFrames + s.noFaceAlerts),
+      tabSwitches: s.tabSwitches,
+      noFaceAlerts: s.noFaceAlerts,
+      awayTime: elapsed(awayMs),
       currentlyAway: !!openEvent.current,
-      awayLabel:     openEvent.current?.label ?? null,
-      liveAwayTime:  liveAway > 0 ? elapsed(liveAway) : null,
+      awayLabel: openEvent.current?.label ?? null,
+      liveAwayTime: liveAway > 0 ? elapsed(liveAway) : null,
     };
   })();
 
@@ -226,7 +201,6 @@ export default function FaceDetection() {
       </div>
 
       <div style={S.content}>
-        {/* video */}
         <div style={S.videoSection}>
           {isDetecting ? (
             <div style={S.detectorWrapper}>
@@ -247,28 +221,22 @@ export default function FaceDetection() {
           )}
         </div>
 
-        {/* right panel */}
         <div style={S.infoSection}>
-          {/* status */}
           <div style={S.card}>
             <h3 style={S.cardTitle}>System Status</h3>
             <div style={{
               ...S.badge,
               backgroundColor:
-                status === 'Idle'             ? '#444'     :
-                status === 'Initializing...'  ? '#f59f00'  :
-                status === 'Face Detected'    ? '#2b8a3e'  : '#e03131'
+                status === 'Idle' ? '#444' :
+                  status === 'Initializing...' ? '#f59f00' :
+                    status === 'Face Detected' ? '#2b8a3e' : '#e03131'
             }}>
               {status}
             </div>
           </div>
-
-          {/* live session stats */}
           {isDetecting && liveStats && (
             <div style={{ ...S.card, border: liveStats.currentlyAway ? '1px solid #e03131' : '1px solid #2c2e33' }}>
               <h3 style={S.cardTitle}>📊 Live Session Stats</h3>
-
-              {/* away banner */}
               {liveStats.currentlyAway && (
                 <div style={S.awayBanner}>
                   <span>🔴 Away: {liveStats.awayLabel}</span>
@@ -277,19 +245,17 @@ export default function FaceDetection() {
               )}
 
               <div style={S.statsGrid}>
-                <StatItem label="Started"        value={sessionData?.startTime ? fmt(sessionData.startTime) : '—'} />
-                <StatItem label="Duration"       value={liveStats.duration} />
-                <StatItem label="Attention"      value={`${liveStats.attentionPct}%`}
+                <StatItem label="Started" value={sessionData?.startTime ? fmt(sessionData.startTime) : '—'} />
+                <StatItem label="Duration" value={liveStats.duration} />
+                <StatItem label="Attention" value={`${liveStats.attentionPct}%`}
                   highlight={liveStats.attentionPct >= 75 ? 'green' : liveStats.attentionPct >= 50 ? 'yellow' : 'red'} />
-                <StatItem label="Away Time"      value={liveStats.awayTime} />
-                <StatItem label="Distractions"   value={liveStats.tabSwitches} />
+                <StatItem label="Away Time" value={liveStats.awayTime} />
+                <StatItem label="Distractions" value={liveStats.tabSwitches} />
                 <StatItem label="No-Face Alerts" value={liveStats.noFaceAlerts} />
               </div>
               <AttentionBar pct={liveStats.attentionPct} />
             </div>
           )}
-
-          {/* logs */}
           <div style={{ ...S.card, flex: 1, minHeight: '200px' }}>
             <h3 style={S.cardTitle}>Recent Activity</h3>
             {logs.length === 0 ? (
@@ -317,9 +283,6 @@ export default function FaceDetection() {
     </div>
   );
 }
-
-// ─── sub-components ───────────────────────────────────────────────────────────
-
 function StatItem({ label, value, highlight }) {
   const color = highlight === 'green' ? '#8ce99a' : highlight === 'yellow' ? '#ffd43b' : highlight === 'red' ? '#ff8787' : '#e9ecef';
   return (
@@ -352,8 +315,6 @@ function SessionReport({ report }) {
     <div style={S.reportContainer}>
       <h2 style={S.reportTitle}>📋 Session Report</h2>
       <p style={{ color: '#868e96', margin: '0 0 1.5rem 0' }}>{report.date}</p>
-
-      {/* grade */}
       <div style={{ ...S.gradeBanner, borderColor: gradeColor }}>
         <span style={{ fontSize: '2rem' }}>
           {report.grade === 'Excellent' ? '🏆' : report.grade === 'Good' ? '👍' : report.grade === 'Fair' ? '📈' : '⚠️'}
@@ -363,25 +324,21 @@ function SessionReport({ report }) {
           <div style={{ color: '#adb5bd', fontSize: '0.9rem' }}>Overall attention rating</div>
         </div>
       </div>
-
-      {/* summary grid */}
       <div style={S.reportGrid}>
-        <ReportCard icon="🕐" label="Start Time"     value={report.startTime} />
-        <ReportCard icon="🕔" label="End Time"       value={report.endTime} />
-        <ReportCard icon="⏱"  label="Total Duration" value={report.totalDuration} />
-        <ReportCard icon="🎯" label="Focused Time"   value={report.focusedTime} />
-        <ReportCard icon="🚶" label="Away Time"      value={report.awayTime} />
-        <ReportCard icon="👁"  label="Attention %"   value={`${report.attentionPercent}%`}
+        <ReportCard icon="🕐" label="Start Time" value={report.startTime} />
+        <ReportCard icon="🕔" label="End Time" value={report.endTime} />
+        <ReportCard icon="⏱" label="Total Duration" value={report.totalDuration} />
+        <ReportCard icon="🎯" label="Focused Time" value={report.focusedTime} />
+        <ReportCard icon="🚶" label="Away Time" value={report.awayTime} />
+        <ReportCard icon="👁" label="Attention %" value={`${report.attentionPercent}%`}
           highlight={report.attentionPercent >= 75 ? '#8ce99a' : report.attentionPercent >= 50 ? '#ffd43b' : '#ff8787'} />
         <ReportCard icon="🔔" label="No-Face Alerts" value={report.noFaceAlerts} />
-        <ReportCard icon="🔀" label="Distractions"   value={report.tabSwitches} />
+        <ReportCard icon="🔀" label="Distractions" value={report.tabSwitches} />
       </div>
 
       <div style={{ marginBottom: '2rem' }}>
         <AttentionBar pct={report.attentionPercent} />
       </div>
-
-      {/* away events table */}
       {report.awayEvents.length > 0 && (
         <div style={S.timelineSection}>
           <h3 style={S.cardTitle}>🗂 Distraction Log</h3>
@@ -424,8 +381,6 @@ function SessionReport({ report }) {
           </div>
         </div>
       )}
-
-      {/* insights */}
       <div style={S.insightsSection}>
         <h3 style={S.cardTitle}>💡 Insights</h3>
         <ul style={{ margin: 0, padding: '0 0 0 1.2rem', color: '#adb5bd', lineHeight: '1.9' }}>
@@ -454,8 +409,6 @@ function ReportCard({ icon, label, value, highlight }) {
     </div>
   );
 }
-
-// ─── styles ───────────────────────────────────────────────────────────────────
 const S = {
   container: {
     padding: '2rem', maxWidth: '1200px', margin: '0 auto',
@@ -524,7 +477,7 @@ const S = {
     borderRadius: '8px', display: 'flex', gap: '0.6rem', alignItems: 'center', borderLeft: '3px solid #444',
   },
   logTime: { color: '#868e96', fontFamily: '"Fira Code", monospace', fontSize: '0.8rem', whiteSpace: 'nowrap' },
-  // report
+
   reportContainer: {
     marginTop: '3rem', backgroundColor: '#1a1b1e', borderRadius: '20px',
     border: '1px solid #2c2e33', padding: '2rem', boxShadow: '0 8px 24px rgba(0,0,0,0.3)',

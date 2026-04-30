@@ -2,8 +2,6 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-
-// ✅ CORS (fix frontend connection)
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -13,10 +11,6 @@ app.use(
 );
 
 app.use(express.json());
-
-// -----------------------------
-// 📊 FOCUS DATA
-// -----------------------------
 app.get("/api/focus", (req, res) => {
   const states = ["Focused", "Distracted", "Stuck", "Fatigued"];
 
@@ -26,10 +20,6 @@ app.get("/api/focus", (req, res) => {
     timestamp: new Date().toLocaleTimeString(),
   });
 });
-
-// -----------------------------
-// 🤖 AI INSIGHTS
-// -----------------------------
 app.post("/api/ai", (req, res) => {
   const { focus, apps } = req.body;
 
@@ -46,9 +36,6 @@ app.post("/api/ai", (req, res) => {
   });
 });
 
-// -----------------------------
-// 🖥️ APP USAGE
-// -----------------------------
 app.get("/api/apps", (req, res) => {
   res.json([
     { name: "VS Code", time: "2h 10m" },
@@ -57,9 +44,6 @@ app.get("/api/apps", (req, res) => {
   ]);
 });
 
-// -----------------------------
-// 🎥 FACE STATE (mock for Flask)
-// -----------------------------
 app.get("/api/face", (req, res) => {
   const states = ["Looking", "Away", "Sleeping"];
 
@@ -69,16 +53,11 @@ app.get("/api/face", (req, res) => {
   });
 });
 
-// -----------------------------
-// 🧪 HEALTH CHECK
-// -----------------------------
 app.get("/", (req, res) => {
   res.send("🚀 Zenith Backend Running");
 });
 
-// -----------------------------
-// 🚀 START SERVER
-// -----------------------------
+
 const PORT = 5000;
 
 app.listen(PORT, () => {

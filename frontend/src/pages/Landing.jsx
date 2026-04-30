@@ -122,8 +122,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
-      {/* TESTIMONIALS */}
       <section id="testimonials" style={styles.section}>
         <h2 className="fade">Loved by creators</h2>
 
@@ -139,13 +137,9 @@ export default function Landing() {
           ))}
         </div>
       </section>
-
-      {/* FOOTER */}
       <footer style={styles.footer}>
         <p>© 2026 Zenith. Built for deep work.</p>
       </footer>
-
-      {/* ANIMATIONS */}
       <style>{`
       .pop {
   animation: popIn 0.4s ease;

@@ -32,10 +32,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Landing WITHOUT layout */}
         <Route path="/" element={<Landing />} />
-
-        {/* All other pages WITH layout */}
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/face" element={<FaceDetection />} />
