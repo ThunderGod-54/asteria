@@ -4,6 +4,8 @@ import {
   Route,
   Outlet,
   useLocation,
+  useParams,
+  Navigate,
 } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
@@ -28,6 +30,12 @@ function Layout() {
   );
 }
 
+// Handles /join/:roomId and /playground/:roomId share links from Sketchly
+function ToolsWithRoom() {
+  const { roomId } = useParams();
+  return <Tools initialRoomId={roomId} />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -39,6 +47,8 @@ export default function App() {
           <Route path="/tracker" element={<AppTracker />} />
           <Route path="/ai" element={<Ai />} />
           <Route path="/tools" element={<Tools />} />
+          <Route path="/join/:roomId" element={<ToolsWithRoom />} />
+          <Route path="/playground/:roomId" element={<ToolsWithRoom />} />
         </Route>
       </Routes>
     </BrowserRouter>

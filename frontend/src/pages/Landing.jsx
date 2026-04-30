@@ -432,9 +432,9 @@ export default function Landing() {
       {/* ── MARQUEE ── */}
       <div style={{ overflow: "hidden", padding: "32px 0", borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
         <div className="marquee-track">
-          {[...Array(2)].flatMap(() =>
+          {[...Array(2)].flatMap((_, copy) =>
             ["FOCUS MORE", "DISTRACT LESS", "FLOW DEEPER", "WORK SMARTER", "AI-COACHED", "PRIVACY FIRST", "REAL-TIME", "100% LOCAL"].map((t, i) => (
-              <span key={`${t}-${i}`} style={{
+              <span key={`${copy}-${t}-${i}`} style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 32, letterSpacing: 4,
                 color: i % 2 === 0 ? fg : "transparent",
