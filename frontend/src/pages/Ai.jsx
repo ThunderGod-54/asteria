@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Sparkles, Send, Bot, User, ArrowLeft,
+  Sparkles, Send, Bot, User, ArrowLeft, ArrowUp,
   Trash2, Brain, Zap, Target, History,
-  Maximize2, Minimize2, Terminal, Info
+  Maximize2, Minimize2, Terminal, Info, Mic,
+  Volume2, VolumeX
 } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import ReactMarkdown from 'react-markdown';
@@ -34,7 +35,98 @@ export default function Ai() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const scrollRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+
+  const speak = (text) => {
+    if (isMuted) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    // Strip markdown for cleaner speech
+    const cleanText = text.replace(/[*_#`]/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.1;
+    utterance.pitch = 1.0;
+    const voices = synth.getVoices();
+    const naturalVoice = voices.find(v => v.name.includes("Google") || v.name.includes("Natural"));
+    if (naturalVoice) utterance.voice = naturalVoice;
+    synth.speak(utterance);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      clearTimeout(silenceTimerRef.current);
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      clearTimeout(silenceTimerRef.current);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Try Chrome.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => setIsListening(true);
+
+      recognition.onresult = (event) => {
+        // Only use final results to avoid duplicate/accumulating text
+        let finalTranscript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInput(finalTranscript);
+          // Auto-send after 1.5s of silence
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            recognition.stop();
+          }, 1500);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        // Trigger send if there's text in the input
+        setInput(prev => {
+          if (prev.trim()) {
+            setTimeout(() => handleSend(), 0);
+          }
+          return prev;
+        });
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error(err);
+      setIsListening(false);
+    }
+  };
 
   const bg = dark ? "#080808" : "#F5F5F0";
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
@@ -51,9 +143,13 @@ export default function Ai() {
 
   const handleSend = async (e) => {
     if (e) e.preventDefault();
-    if (!input.trim() || loading) return;
+    if (loading) return;
 
-    const userMsg = { role: "user", content: input };
+    // Capture current input value directly
+    const currentInput = input.trim();
+    if (!currentInput) return;
+
+    const userMsg = { role: "user", content: currentInput };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
@@ -64,7 +160,7 @@ export default function Ai() {
       const lastSession = sessions[0] || {};
 
       const promptContext = `
-        User Question: ${input}
+        User Question: ${currentInput}
         
         Session Context:
         - Attention Score: ${lastSession.attentionPercent}%
@@ -82,6 +178,7 @@ export default function Ai() {
         role: "ai",
         content: responseText
       }]);
+      speak(responseText);
     } catch (error) {
       console.error("Gemini Error:", error);
       setMessages(prev => [...prev, { role: "ai", content: "I'm having trouble connecting to my neural core. Please check your API key in .env." }]);
@@ -91,19 +188,27 @@ export default function Ai() {
   };
 
   return (
-    <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", position: "relative", overflow: "hidden" }}>
+    <div style={{
+      background: bg,
+      color: fg,
+      height: "100vh",
+      fontFamily: "'DM Sans', sans-serif",
+      position: "relative",
+      overflow: "hidden",
+      display: "flex",
+      flexDirection: "column"
+    }}>
       <Noise />
 
       {/* ── HEADER ── */}
       <header style={{
-        position: "fixed", top: 0, left: 0, right: 0,
         height: 70, borderBottom: `1px solid ${border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px 0 180px", background: `${bg}CC`, backdropFilter: "blur(20px)",
-        zIndex: 100
+        padding: "0 24px", background: `${bg}CC`, backdropFilter: "blur(20px)",
+        zIndex: 100,
+        flexShrink: 0
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ background: fg, color: bg, borderRadius: 8, padding: 6, display: "flex" }}>
               <Brain size={20} />
@@ -115,6 +220,16 @@ export default function Ai() {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
+          <button 
+            style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: 8, cursor: "pointer", display: "flex", alignItems: "center" }} 
+            onClick={() => {
+              setIsMuted(!isMuted);
+              window.speechSynthesis.cancel();
+            }}
+            title={isMuted ? "Unmute AI Voice" : "Mute AI Voice"}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
           <button style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }} onClick={() => setMessages([messages[0]])}>
             CLEAR CHAT
           </button>
@@ -125,67 +240,74 @@ export default function Ai() {
       <main
         ref={scrollRef}
         style={{
-          maxWidth: 800, margin: "0 auto", padding: "100px 24px 140px",
-          marginLeft: "calc(50% - 400px + 140px)", // Increased shift to balance expanded sidebar
-          height: "100vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 32,
-          scrollBehavior: "smooth"
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          scrollBehavior: "smooth",
+          padding: "40px 24px"
         }}
       >
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              width: "100%",
-              animation: "fadeUp 0.5s ease-out forwards"
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: fgMuted, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>
-              {msg.role === 'ai' ? <><Sparkles size={12} /> ZENITH INTELLIGENCE</> : <><User size={12} /> YOU</>}
-            </div>
+        <div style={{ maxWidth: 800, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: 32 }}>
+          {messages.map((msg, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                width: "100%",
+                animation: "fadeUp 0.5s ease-out forwards"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: fgMuted, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>
+                {msg.role === 'ai' ? <><Sparkles size={12} /> ZENITH INTELLIGENCE</> : <><User size={12} /> YOU</>}
+              </div>
 
-            <div style={{
-              background: msg.role === 'ai' ? cardBg : "transparent",
-              border: `1px solid ${msg.role === 'ai' ? border : cardBorder}`,
-              borderRadius: 20,
-              padding: "16px 24px",
-              maxWidth: "85%",
-              color: msg.role === 'user' ? fg : fg,
-              fontSize: 15,
-              lineHeight: 1.6,
-              boxShadow: msg.role === 'ai' ? "0 4px 20px rgba(0,0,0,0.1)" : "none"
-            }}>
-              <ReactMarkdown
-                components={{
-                  p: ({ node, ...props }) => <p style={{ margin: 0 }} {...props} />,
-                  code: ({ node, ...props }) => <code style={{ background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)", padding: "2px 4px", borderRadius: 4 }} {...props} />
-                }}
-              >
-                {msg.content}
-              </ReactMarkdown>
+              <div style={{
+                background: msg.role === 'ai' ? cardBg : "transparent",
+                border: `1px solid ${msg.role === 'ai' ? border : cardBorder}`,
+                borderRadius: 20,
+                padding: "16px 24px",
+                maxWidth: "85%",
+                color: msg.role === 'user' ? fg : fg,
+                fontSize: 15,
+                lineHeight: 1.6,
+                boxShadow: msg.role === 'ai' ? "0 4px 20px rgba(0,0,0,0.1)" : "none"
+              }}>
+                <ReactMarkdown
+                  components={{
+                    p: ({ node, ...props }) => <p style={{ margin: 0 }} {...props} />,
+                    code: ({ node, ...props }) => <code style={{ background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)", padding: "2px 4px", borderRadius: 4 }} {...props} />
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {loading && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", color: fgMuted }}>
-            <Zap size={14} className="spinning" />
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>ANALYZING TELEMETRY...</span>
-          </div>
-        )}
+          {loading && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", color: fgMuted }}>
+              <Zap size={14} className="spinning" />
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>ANALYZING TELEMETRY...</span>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* ── INPUT BAR ── */}
       <div style={{
-        position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)",
-        width: "calc(100% - 48px)", maxWidth: 760, zIndex: 100,
-        marginLeft: 160 // Further shift for expanded sidebar symmetry
+        padding: "20px 24px 40px",
+        width: "100%",
+        zIndex: 100,
+        flexShrink: 0
       }}>
         <form
           onSubmit={handleSend}
           style={{
+            maxWidth: 760,
+            margin: "0 auto",
             background: dark ? "rgba(20,20,20,0.8)" : "rgba(255,255,255,0.8)",
             backdropFilter: "blur(20px)",
             border: `1px solid ${border}`,
@@ -216,6 +338,24 @@ export default function Ai() {
             }}
           />
           <button
+            type="button"
+            onClick={toggleListening}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: isListening ? "#ff4b4b" : fgMuted,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 8px",
+              transition: "all 0.3s"
+            }}
+          >
+            <Mic size={24} className={isListening ? "listening" : ""} />
+          </button>
+
+          <button
             type="submit"
             className="glow-btn"
             disabled={!input.trim() || loading}
@@ -223,9 +363,9 @@ export default function Ai() {
               background: fg,
               color: bg,
               border: "none",
-              borderRadius: 16,
-              width: 44,
-              height: 44,
+              borderRadius: "35%",
+              width: 54,
+              height: 54,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -234,7 +374,7 @@ export default function Ai() {
               transition: "all 0.2s"
             }}
           >
-            <Send size={20} />
+            <ArrowUp size={36} strokeWidth={3} />
           </button>
         </form>
         <div style={{ textAlign: "center", marginTop: 12, fontSize: 10, color: fgMuted, letterSpacing: 0.5, fontWeight: 600 }}>
@@ -249,6 +389,15 @@ export default function Ai() {
         }
         .spinning {
           animation: spin 1s linear infinite;
+        }
+        .listening {
+          color: #ff4b4b !important;
+          animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.7; }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes spin {
           from { transform: rotate(0deg); }
