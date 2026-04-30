@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 :root {
   --bg-color: #f4f4f5;
   --text-color: #18181b;
@@ -32,6 +36,13 @@ body {
   background-color: var(--bg-color);
   color: var(--text-color);
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .container {
@@ -106,4 +117,39 @@ input {
 
 .icon-btn:hover {
   background-color: var(--card-border);
+}
+
+/* Global Responsive Utils */
+@media (max-width: 1536px) {
+  :root {
+    --container-padding: 24px;
+  }
+}
+
+@media (max-width: 1280px) {
+  :root {
+    --container-padding: 20px;
+  }
+}
+
+.container {
+  padding: var(--container-padding, 30px);
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    height: 100vh;
+    z-index: 1001;
+  }
 }

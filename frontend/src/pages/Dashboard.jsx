@@ -45,6 +45,7 @@ const styles = {
   grid: {
     display: "flex",
     gap: "20px",
+    flexWrap: "wrap",
   },
   big: {
     fontSize: "40px",
@@ -54,5 +55,6 @@ const styles = {
     marginTop: "30px",
     display: "flex",
     gap: "15px",
+    flexWrap: "wrap",
   },
 };

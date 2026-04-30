@@ -233,13 +233,14 @@ const styles = {
   },
 
   cta: {
-    background: "#fff",
-    color: "#000",
-    border: "none",
     padding: "10px 18px",
-    cursor: "pointer",
     borderRadius: "6px",
+    cursor: "pointer",
     fontWeight: "bold",
+    border: "1px solid var(--text-color)",
+    background: "var(--text-color)",
+    color: "var(--bg-color)",
+    transition: "all 0.3s ease",
   },
 
   hero: {
@@ -282,14 +283,12 @@ const styles = {
 
   primaryBtn: {
     padding: "14px 30px",
-    background: "#fff",
-    color: "#000",
-    border: "none",
+    border: "1px solid var(--text-color)",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",
+    transition: "all 0.3s ease",
   },
-
   section: {
     marginTop: "150px",
     textAlign: "center",
