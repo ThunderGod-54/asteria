@@ -1,11 +1,13 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import heroImg from "../assets/doodle2.jpeg";
 import heroImgLight from "../assets/doodle1.png";
+import { useTheme } from "../Theme";
+import { Sun, Moon } from "lucide-react";
 
 export default function Landing() {
   const nav = useNavigate();
-  const [dark, setDark] = useState(true);
+  const { dark, setDark } = useTheme();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -45,41 +47,7 @@ export default function Landing() {
         <div style={styles.actions}>
           {/* SVG THEME TOGGLE */}
           <button style={styles.toggle} onClick={() => setDark(!dark)}>
-            {dark ? (
-              <svg
-                width="20"
-                height="20"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-              >
-                <circle cx="10" cy="10" r="3.5" />
-
-                {/* Vertical */}
-                <line x1="10" y1="0" x2="10" y2="3" />
-                <line x1="10" y1="17" x2="10" y2="20" />
-
-                {/* Horizontal */}
-                <line x1="0" y1="10" x2="3" y2="10" />
-                <line x1="17" y1="10" x2="20" y2="10" />
-
-                {/* Diagonals */}
-                <line x1="3" y1="3" x2="5" y2="5" />
-                <line x1="15" y1="15" x2="17" y2="17" />
-                <line x1="3" y1="17" x2="5" y2="15" />
-                <line x1="15" y1="5" x2="17" y2="3" />
-              </svg>
-            ) : (
-              <svg
-                width="22"
-                height="22"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
+            {dark ? <Sun color="white" size={20} /> : <Moon color="black" size={20} />}
           </button>
 
           <button style={styles.cta} onClick={() => nav("/dashboard")}>
@@ -146,6 +114,11 @@ export default function Landing() {
             <h3>Pro</h3>
             <p>AI insights + reports</p>
             <h1>₹499/mo</h1>
+          </div>
+          <div style={styles.card} className="fade">
+            <h3>B2B/Small-Startup Teams</h3>
+            <p>Collaborative platform</p>
+            <h1>₹999/mo</h1>
           </div>
         </div>
       </section>
