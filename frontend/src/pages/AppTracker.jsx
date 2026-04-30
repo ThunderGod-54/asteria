@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { getSessions, deleteSession, clearAllSessions } from '../services/sessionStore';
 import { useTheme } from "../Theme";
+import { db, auth } from "../firebase";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 
 const elapsed = (ms) => {
   if (!ms || ms <= 0) return '0s';
@@ -81,6 +83,7 @@ const downloadAllCSV = (sessions) => {
 export default function AppTracker() {
   const { dark } = useTheme();
   const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [filter, setFilter] = useState('all');
@@ -92,7 +95,29 @@ export default function AppTracker() {
   const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
   const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
-  const reload = useCallback(() => setSessions(getSessions()), []);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const local = getSessions();
+    let cloud = [];
+
+    if (auth.currentUser) {
+      try {
+        const q = query(
+          collection(db, "sessions"),
+          where("userId", "==", auth.currentUser.uid),
+          orderBy("createdAt", "desc")
+        );
+        const snap = await getDocs(q);
+        cloud = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      } catch (e) {
+        console.error("Cloud Fetch Error:", e);
+      }
+    }
+
+    setSessions(cloud.length > 0 ? cloud : local);
+    setLoading(false);
+  }, []);
+
   useEffect(() => { reload(); }, [reload]);
 
   const handleDelete = (id) => { deleteSession(id); if (selected === id) setSelected(null); reload(); };
@@ -156,6 +181,13 @@ export default function AppTracker() {
         position: absolute;
         left: 0;
         color: ${fgMuted};
+      }
+      .spinning {
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
     `;
     document.head.appendChild(style);
@@ -243,7 +275,14 @@ export default function AppTracker() {
         )}
 
         {/* ── EMPTY STATE ── */}
-        {total === 0 && (
+        {loading && (
+          <div style={{ textAlign: "center", padding: "100px 0", color: fgMuted }}>
+            <Activity size={32} className="spinning" style={{ marginBottom: 16 }} />
+            <p>Syncing focus intelligence...</p>
+          </div>
+        )}
+
+        {!loading && total === 0 && (
           <div className="fade-up" style={{ textAlign: "center", padding: "100px 0" }}>
             <div style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: "50%", width: 80, height: 80, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
               <Inbox size={32} color={fgMuted} />
@@ -351,28 +390,60 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
                 Rating: <span style={{ color: fg, fontWeight: 700 }}>{s.grade}</span>. {sessionSummary(s)}
               </div>
             </div>
-            
-            <div style={{ 
-              background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", 
-              borderRadius: 16, padding: 20, border: `1px solid ${border}` 
+
+            <div style={{
+              background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+              borderRadius: 16, padding: 20, border: `1px solid ${border}`
             }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: fgMuted, marginBottom: 12, letterSpacing: 1 }}>FOCUS TELEMETRY PULSE</div>
               <FocusPulseChart data={s.pulseData || [70, 80, 65, 90, 75]} color={fg} />
             </div>
           </div>
 
-          {/* Distraction Log (Timeline) */}
+          {/* Distraction Log (Enhanced Timeline) */}
           {(s.awayEvents || []).length > 0 && (
-            <div style={{ marginBottom: 32 }}>
-              <h4 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1, marginBottom: 16 }}>DISTRACTION TIMELINE</h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {s.awayEvents.map((ev, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0", borderTop: `1px solid ${border}`, fontSize: 13 }}>
-                    <div style={{ color: fgMuted, fontSize: 11, fontWeight: 700, width: 80 }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div style={{ flex: 1, fontWeight: 500 }}>{ev.label}</div>
-                    <div style={{ color: fgMuted, fontSize: 11 }}>{elapsed(ev.durationMs)}</div>
-                  </div>
-                ))}
+            <div style={{ marginBottom: 48 }}>
+              <h4 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 2, marginBottom: 24, textTransform: "uppercase" }}>DISTRACTION TELEMETRY LOG</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {s.awayEvents.map((ev, i) => {
+                  const startTime = ev.startTime ? new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+                  const endTime = ev.endTime ? new Date(ev.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '...';
+                  const label = ev.label || 'Unknown Distraction';
+                  const isApp = label.includes('Switched to:');
+
+                  return (
+                    <div key={i} style={{ display: "flex", gap: 24, position: "relative" }}>
+                      {/* Timeline Line */}
+                      {i !== s.awayEvents.length - 1 && (
+                        <div style={{ position: "absolute", left: 15, top: 24, bottom: -24, width: 2, background: border, opacity: 0.5 }} />
+                      )}
+
+                      {/* Icon Node */}
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%", background: isApp ? "#f87171" : cardBg,
+                        border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center",
+                        zIndex: 2, flexShrink: 0, color: isApp ? "#fff" : fgMuted
+                      }}>
+                        {ev.kind === 'tab' ? <Globe size={14} /> : <Monitor size={14} />}
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ flex: 1, paddingBottom: 32 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: isApp ? fg : fgMuted }}>
+                            {label.replace('Switched to: ', '')}
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: fgMuted, background: cardBg, padding: "4px 8px", borderRadius: 6 }}>
+                            {elapsed(ev.durationMs)}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, color: fgMuted, display: "flex", alignItems: "center", gap: 6 }}>
+                          <Clock size={12} /> {startTime} — {endTime}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -479,4 +550,4 @@ function FocusPulseChart({ data, color }) {
     </svg>
   );
 }
-
+

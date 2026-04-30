@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaceDetector } from 'face-detection-module';
 import { saveSession } from '../services/sessionStore';
+import { io } from "socket.io-client";
 import {
   Trophy, ThumbsUp, TrendingUp, AlertTriangle,
   Sparkles, Play, Square, Activity, Clock, Eye,
@@ -9,6 +10,8 @@ import {
   History, BarChart2, Calendar, Target, MousePointer2
 } from 'lucide-react';
 import { useTheme } from "../Theme";
+import { db, auth } from "../firebase";
+import { collection, addDoc } from "firebase/firestore";
 
 const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const fmtDate = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -51,6 +54,7 @@ export default function FaceDetection() {
   const sessionRef = useRef(null);
   const awayEvents = useRef([]);
   const openEvent = useRef(null);
+  const socketRef = useRef(null);
   const reportRef = useRef(null);
   const tickRef = useRef(null);
   const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
@@ -68,6 +72,16 @@ export default function FaceDetection() {
   }, []);
 
   useEffect(() => {
+    socketRef.current = io("http://localhost:5001");
+
+    socketRef.current.on("distraction-log", ({ app }) => {
+      // Update the most recent 'away' event with the specific app name
+      if (openEvent.current) {
+        openEvent.current.label = `Switched to: ${app}`;
+        addLog(`🚩 Distraction: ${app}`, 'warn');
+      }
+    });
+
     if (isDetecting) {
       let ticks = 0;
       tickRef.current = setInterval(() => {
@@ -110,6 +124,7 @@ export default function FaceDetection() {
     const onVisChange = () => {
       if (document.hidden) {
         goAway('tab', `Tab hidden — "${document.title}"`);
+        socketRef.current?.emit("tab-hidden");
       } else {
         comeBack('Tab visible again');
       }
@@ -118,6 +133,7 @@ export default function FaceDetection() {
     const onBlur = () => {
       if (!document.hidden) {
         goAway('minimize', 'Window minimized / app switched');
+        socketRef.current?.emit("tab-hidden");
       }
     };
 
@@ -134,6 +150,7 @@ export default function FaceDetection() {
       document.removeEventListener('visibilitychange', onVisChange);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('focus', onFocus);
+      socketRef.current?.disconnect();
     };
   }, [isDetecting, addLog]);
 
@@ -205,6 +222,21 @@ export default function FaceDetection() {
       grade: attentionPct >= 85 ? 'Excellent' : attentionPct >= 65 ? 'Good' : attentionPct >= 40 ? 'Fair' : 'Needs Improvement',
     };
     saveSession(builtReport);
+
+    // ─── CLOUD SAVE (FIRESTORE) ───
+    if (auth.currentUser) {
+      addDoc(collection(db, "sessions"), {
+        ...builtReport,
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName,
+        createdAt: new Date().toISOString(),
+      }).then(() => addLog('Cloud sync complete', 'info'))
+        .catch(e => {
+          console.error("Firestore Error:", e);
+          addLog('Cloud sync failed', 'error');
+        });
+    }
+
     setReport(builtReport);
 
     sessionRef.current = null;
@@ -675,17 +707,21 @@ export default function FaceDetection() {
 
             {/* INSIGHTS */}
             <div className="premium-card" style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 24, padding: 32 }}>
-              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 20 }}>INSIGHTS</h3>
-              <div style={{ color: fgMuted, fontSize: 14, lineHeight: 1.8 }}>
-                {report.attentionPercent >= 85 && <div className="insight-item" style={{ color: fg }}>Great focus — you maintained strong attention throughout the session.</div>}
-                {report.attentionPercent < 85 && report.attentionPercent >= 65 && <div className="insight-item">Good session. A few attention dips — try minimizing distractions.</div>}
-                {report.attentionPercent < 65 && <div className="insight-item">Attention was low. Consider shorter sessions with breaks.</div>}
-                {report.tabSwitches === 0 && <div className="insight-item" style={{ color: fg }}>Zero distractions — excellent focus environment!</div>}
-                {report.tabSwitches > 0 && report.tabSwitches <= 3 && <div className="insight-item">Minimal distractions ({report.tabSwitches}) — good discipline.</div>}
-                {report.tabSwitches > 3 && <div className="insight-item">You left the session {report.tabSwitches} times — try closing other apps before starting.</div>}
-                {report.awayEvents.some(e => e.durationMs > 60000) && <div className="insight-item">At least one distraction lasted over a minute — consider using Do Not Disturb mode.</div>}
-                {report.noFaceAlerts > 3 && <div className="insight-item">Multiple no-face alerts — make sure you're seated in front of the camera.</div>}
+              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 20 }}>SESSION ANALYSIS</h3>
+              <div style={{ color: fgMuted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                Your session is complete. Our AI models are ready to analyze your focus patterns, tab switches, and eye-tracking telemetry.
               </div>
+              <button 
+                className="glow-btn"
+                onClick={() => navigate('/ai')}
+                style={{
+                  width: "100%", background: fg, color: bg, border: "none", 
+                  borderRadius: 12, padding: "16px", fontSize: 15, fontWeight: 800, 
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10
+                }}
+              >
+                <Sparkles size={18} /> VIEW AI INSIGHTS
+              </button>
             </div>
 
             <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>

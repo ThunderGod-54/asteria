@@ -3,6 +3,8 @@ const cors = require("cors");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const { v4: uuidv4 } = require("uuid");
+const { exec } = require("child_process");
+const notifier = require("node-notifier");
 
 const app = express();
 const server = createServer(app);
@@ -160,6 +162,35 @@ io.on("connection", (socket) => {
   socket.on("voice-ice", ({ to, candidate }) => { io.to(to).emit("voice-ice", { from: socket.id, candidate }); });
   socket.on("voice-leave", () => { if (currentRoom) socket.to(currentRoom).emit("voice-user-left", { userId: socket.id }); });
 
+  // ─── OS-LEVEL DISTRACTION TRACKING ───
+  socket.on("tab-hidden", () => {
+    // Small delay to ensure the OS registers the new active window
+    setTimeout(() => {
+      const psScript = `(Get-Process | Where-Object {$_.MainWindowHandle -ne 0} | Sort-Object LastProcessorTime -Descending | Select-Object -First 1).ProcessName`;
+      exec(`powershell "${psScript}"`, (err, stdout) => {
+        if (err) return;
+        const appName = stdout.trim();
+
+        // Skip browser processes and empty names
+        const browsers = ['brave', 'chrome', 'msedge', 'firefox', 'opera', 'zenith'];
+        const isBrowser = browsers.some(b => appName.toLowerCase().includes(b));
+
+        if (appName && !isBrowser) {
+          notifier.notify({
+            title: 'Zenith Focus Warning',
+            message: `You just opened ${appName.toUpperCase()}! Stay focused.`,
+            sound: true,
+            wait: true
+          });
+          socket.emit("distraction-log", { app: appName });
+        } else if (appName && isBrowser) {
+          // User just switched tabs but stayed in browser
+          socket.emit("distraction-log", { app: "Other Browser Tab" });
+        }
+      });
+    }, 1200);
+  });
+
   socket.on("disconnect", () => {
     if (!currentRoom) return;
     const room = rooms[currentRoom];
@@ -173,5 +204,5 @@ io.on("connection", (socket) => {
 
 // ─── Start ─────────────────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
