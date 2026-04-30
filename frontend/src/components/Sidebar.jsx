@@ -7,6 +7,10 @@ import {
 } from "lucide-react";
 import { auth, googleProvider } from "../firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import logoBlack from "../assets/logo_white.png";
+import logoWhite from "../assets/logo_black.png";
+import doodleDark from "../assets/sdw.png";
+import doodleLight from "../assets/sdb.png";
 
 export default function Sidebar() {
   const { dark, setDark } = useTheme();
@@ -56,6 +60,13 @@ export default function Sidebar() {
       .sidebar-transition {
         transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
       }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -70,9 +81,10 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="sidebar-transition" style={{
+    <div className="sidebar-transition no-scrollbar" style={{
       width: collapsed ? "80px" : "260px",
       height: "100vh",
+      overflowY: "auto",
       background: bg,
       backdropFilter: "blur(20px)",
       borderRight: `1px solid ${border}`,
@@ -94,10 +106,13 @@ export default function Sidebar() {
       }}>
         {!collapsed && (
           <div
-            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2, cursor: "pointer" }}
+            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
             onClick={() => navigate("/")}
           >
-            ZENITH
+            <img src={dark ? logoWhite : logoBlack} alt="Logo" style={{ height: 32, width: "auto" }} />
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2 }}>
+              ZENITH
+            </div>
           </div>
         )}
         <button
@@ -148,6 +163,24 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* ── DOODLE ART ── */}
+        {!collapsed && (
+          <div style={{ marginTop: 'auto', padding: '10px 0', display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={dark ? doodleDark : doodleLight}
+              alt="Doodle Art"
+              style={{
+                width: '110px',
+                height: 'auto',
+                borderRadius: 12,
+                opacity: 0.6,
+                filter: dark ? 'brightness(0.8)' : 'none',
+                transition: 'opacity 0.3s'
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── FOOTER ── */}

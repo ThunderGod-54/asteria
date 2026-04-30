@@ -7,6 +7,8 @@ import {
 import { useTheme } from "../Theme";
 import heroImg from "../assets/doodle2.jpeg";
 import heroImgLight from "../assets/doodle1.png";
+import logoBlack from "../assets/logo_white.png";
+import logoWhite from "../assets/logo_black.png";
 
 const Noise = () => (
   <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.04 }}>
@@ -240,8 +242,11 @@ export default function Landing() {
         zIndex: 1000,
         boxShadow: dark ? "0 4px 40px rgba(0,0,0,0.6)" : "0 4px 40px rgba(0,0,0,0.08)",
       }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, letterSpacing: 2, cursor: "pointer" }} onClick={() => scrollTo("hero")}>
-          ZENITH
+        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => scrollTo("hero")}>
+          <img src={dark ? logoWhite : logoBlack} alt="Logo" style={{ height: 32, width: "auto" }} />
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, letterSpacing: 2 }}>
+            ZENITH
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 32, fontSize: 14, fontWeight: 500 }}>

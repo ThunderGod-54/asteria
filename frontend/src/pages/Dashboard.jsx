@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  LayoutDashboard, Brain, Eye, Activity, ArrowRight, 
+import {
+  LayoutDashboard, Brain, Eye, Activity, ArrowRight,
   Sun, Moon, Sparkles, LogOut, Settings, BarChart2, Shield, Zap
 } from "lucide-react";
 import { useTheme } from "../Theme";
 import { getFocusData } from "../services/api";
+import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const Noise = () => (
   <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.04 }}>
@@ -21,6 +23,7 @@ export default function Dashboard() {
     score: 0,
     state: "Loading...",
   });
+  const [user, setUser] = useState(null);
   const { dark, setDark } = useTheme();
   const nav = useNavigate();
 
@@ -28,17 +31,24 @@ export default function Dashboard() {
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
   const fgMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
   const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
+  const cardBg = dark ? "rgba(255, 255, 255, 0)" : "#F5F5F0";
   const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     getFocusData().then(setData);
-    
+
     // Auto-refresh data every 30 seconds to keep dashboard live
     const interval = setInterval(() => {
       getFocusData().then(setData);
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -154,12 +164,12 @@ export default function Dashboard() {
       <Noise />
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 24px 80px" }}>
-        
+
         {/* ── HEADER ── */}
         <header className="fade-up" style={{ marginBottom: 64 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `0px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
             <Sparkles size={12} />
-            WELCOME BACK, USER
+            WELCOME BACK, {user?.displayName ? user.displayName.split(' ')[0].toUpperCase() : "USER"}
           </div>
           <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(48px, 8vw, 80px)", letterSpacing: -1, lineHeight: 1, margin: 0 }}>
             YOUR FOCUS <span style={{ WebkitTextStroke: `2px ${fg}`, color: "transparent" }}>OVERVIEW</span>
@@ -168,7 +178,7 @@ export default function Dashboard() {
 
         {/* ── STATS GRID ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24, marginBottom: 64 }}>
-          
+
           <div className="stat-card fade-up" style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 20, padding: "40px 32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", color: fg }}>
@@ -201,10 +211,10 @@ export default function Dashboard() {
         <section className="fade-up">
           <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, letterSpacing: 1, marginBottom: 32 }}>QUICK ACTIONS</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-            
-            <button className="glow-btn" onClick={() => nav("/face")} style={{ 
-              background: fg, color: bg, border: "none", borderRadius: 16, padding: "24px", 
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12 
+
+            <button className="glow-btn" onClick={() => nav("/face")} style={{
+              background: fg, color: bg, border: "none", borderRadius: 16, padding: "24px",
+              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
             }}>
               <Eye size={24} />
               <div style={{ fontWeight: 600, fontSize: 18 }}>Start Session</div>
@@ -214,9 +224,9 @@ export default function Dashboard() {
               </div>
             </button>
 
-            <button className="glow-btn" onClick={() => nav("/tracker")} style={{ 
-              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px", 
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12 
+            <button className="glow-btn" onClick={() => nav("/tracker")} style={{
+              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px",
+              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
             }}>
               <Zap size={24} />
               <div style={{ fontWeight: 600, fontSize: 18 }}>App Tracker</div>
@@ -226,9 +236,9 @@ export default function Dashboard() {
               </div>
             </button>
 
-            <button className="glow-btn" onClick={() => nav("/ai")} style={{ 
-              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px", 
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12 
+            <button className="glow-btn" onClick={() => nav("/ai")} style={{
+              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px",
+              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
             }}>
               <Brain size={24} />
               <div style={{ fontWeight: 600, fontSize: 18 }}>AI Insights</div>
@@ -254,4 +264,4 @@ export default function Dashboard() {
       </footer>
     </div>
   );
-}
+}
