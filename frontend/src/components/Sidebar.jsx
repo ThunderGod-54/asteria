@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../Theme";
-import { Sun, Moon, LayoutDashboard, ScanFace, ActivitySquare, Bot, Wrench, Menu, ChevronLeft } from "lucide-react";
+import { Sun, Moon, LayoutDashboard, ScanFace, ActivitySquare, Bot, Wrench, Menu, ChevronLeft, ArrowLeft } from "lucide-react";
 
 export default function Sidebar() {
   const { dark, setDark } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="sidebar" style={{ ...styles.sidebar, width: collapsed ? "80px" : "250px" }}>
       <div style={styles.top}>
         <div style={{ ...styles.header, flexDirection: collapsed ? "column" : "row" }}>
           {!collapsed && <h2 style={styles.logo}>Zenith</h2>}
-          
+
           <div style={{ display: "flex", gap: "10px", flexDirection: collapsed ? "column" : "row" }}>
+            <button className="icon-btn" onClick={() => navigate("/")} title="Back to Home">
+              <ArrowLeft size={20} />
+            </button>
             <button className="icon-btn" onClick={() => setDark(!dark)} title="Toggle Theme">
               {dark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
@@ -38,12 +42,12 @@ export default function Sidebar() {
 function SidebarLink({ to, icon, label, collapsed }) {
   const location = useLocation();
   const isActive = location.pathname === to;
-  
+
   return (
-    <Link 
-      to={to} 
+    <Link
+      to={to}
       className="sidebar-link"
-      style={{ 
+      style={{
         color: isActive ? "var(--link-hover)" : "var(--link-color)",
         justifyContent: collapsed ? "center" : "flex-start",
         backgroundColor: isActive ? "var(--card-border)" : "transparent"
