@@ -30,6 +30,8 @@ export default function FaceDetection() {
   const awayEvents = useRef([]);
   const openEvent = useRef(null);
   const tickRef = useRef(null);
+  const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')); // Premium notification sound
+
 
   const addLog = useCallback((message, type = 'info') => {
     const time = new Date().toLocaleTimeString();
@@ -105,7 +107,12 @@ export default function FaceDetection() {
 
   const handleNoFace = useCallback(() => {
     setStatus('No Face Detected!');
-    if (sessionRef.current) sessionRef.current.noFaceAlerts += 1;
+    if (sessionRef.current) {
+      sessionRef.current.noFaceAlerts += 1;
+      // Play alert sound
+      alertAudio.current.currentTime = 0;
+      alertAudio.current.play().catch(e => console.log("Audio play blocked by browser", e));
+    }
     addLog('⚠️ No face detected!', 'error');
   }, [addLog]);
   const startSession = () => {
