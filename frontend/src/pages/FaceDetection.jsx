@@ -43,6 +43,7 @@ export default function FaceDetection() {
   const [status, setStatus] = useState('Idle');
   const [sessionData, setSessionData] = useState(null);
   const [report, setReport] = useState(null);
+  const [showDemo, setShowDemo] = useState(false);
   const [, forceRender] = useState(0);
 
   const sessionRef = useRef(null);
@@ -386,6 +387,37 @@ export default function FaceDetection() {
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: status === 'Face Detected' ? "#4ade80" : "#fbbf24" }} />
             <span style={{ fontWeight: 600, color: fg }}>{status}</span>
           </div>
+
+          {!isDetecting && !report && (
+            <button 
+              onClick={() => {
+                const demo = {
+                  date: fmtDate(new Date()),
+                  startTime: "09:00 AM",
+                  endTime: "10:30 AM",
+                  totalDuration: "1h 30m",
+                  focusedTime: "1h 12m",
+                  awayTime: "18m",
+                  attentionPercent: 82,
+                  noFaceAlerts: 4,
+                  tabSwitches: 3,
+                  awayEvents: [
+                    { startTime: new Date(), endTime: new Date(), durationMs: 600000, kind: 'tab', label: 'Slack' },
+                    { startTime: new Date(), endTime: new Date(), durationMs: 300000, kind: 'minimize', label: 'Spotify' }
+                  ],
+                  grade: 'Excellent',
+                  pulseData: [80, 85, 70, 90, 88, 95, 60, 85, 90]
+                };
+                setReport(demo);
+              }}
+              style={{ 
+                background: "transparent", color: fgMuted, border: `1px solid ${border}`, 
+                borderRadius: 14, padding: "16px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" 
+              }}
+            >
+              View Demo Report
+            </button>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 32, alignItems: "start" }}>
@@ -526,15 +558,25 @@ export default function FaceDetection() {
               <div style={{ height: 1, flex: 1, background: border }} />
             </div>
 
-            <div style={{ 
-              display: 'flex', alignItems: 'center', gap: '1.5rem', 
-              backgroundColor: cardBg, borderRadius: '16px', padding: '24px 32px', 
-              marginBottom: '32px', border: `1px solid ${cardBorder}` 
-            }}>
-              <GradeIcon grade={report.grade} size={40} />
-              <div>
-                <div style={{ color: fg, fontWeight: 800, fontSize: '1.8rem', letterSpacing: '-0.5px', fontFamily: "'Bebas Neue', sans-serif" }}>{report.grade.toUpperCase()}</div>
-                <div style={{ color: fgMuted, fontSize: '14px', fontWeight: 500 }}>Overall attention rating for this session</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 32, marginBottom: 40, flexWrap: "wrap" }}>
+              <div style={{ 
+                display: 'flex', alignItems: 'center', gap: '1.5rem', 
+                backgroundColor: cardBg, borderRadius: '24px', padding: '32px', 
+                border: `1px solid ${cardBorder}`, height: "100%"
+              }}>
+                <GradeIcon grade={report.grade} size={48} />
+                <div>
+                  <div style={{ color: fg, fontWeight: 800, fontSize: '2.4rem', lineHeight: 1, letterSpacing: '-1px', fontFamily: "'Bebas Neue', sans-serif" }}>{report.grade.toUpperCase()}</div>
+                  <div style={{ color: fgMuted, fontSize: '14px', fontWeight: 500, marginTop: 4 }}>Attention Rating</div>
+                </div>
+              </div>
+
+              <div style={{ 
+                backgroundColor: cardBg, borderRadius: '24px', padding: '32px', 
+                border: `1px solid ${cardBorder}`, position: "relative"
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: fgMuted, marginBottom: 16, letterSpacing: 1 }}>FOCUS PULSE</div>
+                <FocusPulseChart data={report.pulseData || [70, 85, 60, 90, 75, 95, 80]} color={fg} />
               </div>
             </div>
 
@@ -645,6 +687,43 @@ export default function FaceDetection() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function FocusPulseChart({ data, color }) {
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * 100},${100 - v}`).join(' ');
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: 60, overflow: "visible" }}>
+      <defs>
+        <linearGradient id="pulseGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path
+        d={`M 0,100 L ${points} L 100,100 Z`}
+        fill="url(#pulseGradient)"
+        style={{ transition: "all 1s ease" }}
+      />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+        style={{ transition: "all 1s ease", opacity: 0.8 }}
+      />
+      {data.map((v, i) => (
+        <circle 
+          key={i} 
+          cx={(i / (data.length - 1)) * 100} 
+          cy={100 - v} 
+          r="1.5" 
+          fill={color} 
+        />
+      ))}
+    </svg>
   );
 }
 
