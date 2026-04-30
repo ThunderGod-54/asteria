@@ -2,12 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Brain, Eye, Activity, ArrowRight,
-  Sun, Moon, Sparkles, LogOut, Settings, BarChart2, Shield, Zap
+  Sun, Moon, Sparkles, LogOut, Settings, BarChart2, 
+  Shield, Zap, Clock, TrendingUp, AlertCircle, History,
+  RefreshCw, Quote
 } from "lucide-react";
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, BarChart, Bar, Cell
+} from 'recharts';
 import { useTheme } from "../Theme";
-import { getFocusData } from "../services/api";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { getSessions } from "../services/sessionStore";
 
 const Noise = () => (
   <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.04 }}>
@@ -18,250 +25,309 @@ const Noise = () => (
   </svg>
 );
 
+const Skeleton = ({ width = "100%", height = "20px", borderRadius = "8px" }) => (
+  <div style={{ 
+    width, height, borderRadius, 
+    background: "linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%)",
+    backgroundSize: "200% 100%",
+    animation: "shimmer 1.5s infinite linear"
+  }} />
+);
+
 export default function Dashboard() {
-  const [data, setData] = useState({
-    score: 0,
-    state: "Loading...",
+  const [loading, setLoading] = useState(true);
+  const [sessions, setSessions] = useState([]);
+  const [stats, setStats] = useState({
+    avgAttention: 0,
+    totalSessions: 0,
+    totalDistractions: 0,
+    peakFocus: 0
   });
   const [user, setUser] = useState(null);
+  const [thoughtIdx, setThoughtIdx] = useState(0);
   const { dark, setDark } = useTheme();
+
+  const thoughts = [
+    { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
+    { text: "Deep work is the superpower of the 21st century.", author: "Cal Newport" },
+    { text: "Amateurs sit and wait for inspiration, the rest of us just get up and go to work.", author: "Stephen King" },
+    { text: "Your mind is for having ideas, not holding them.", author: "David Allen" },
+    { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" }
+  ];
+
+  const nextThought = () => setThoughtIdx((thoughtIdx + 1) % thoughts.length);
   const nav = useNavigate();
 
   const bg = dark ? "#080808" : "#F5F5F0";
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
   const fgMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
   const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const cardBg = dark ? "rgba(255, 255, 255, 0)" : "#F5F5F0";
+  const cardBg = dark ? "rgba(255, 255, 255, 0.03)" : "rgba(0,0,0,0.02)";
   const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      fetchData(currentUser);
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    getFocusData().then(setData);
+  const fetchData = async (currentUser) => {
+    setLoading(true);
+    let allSessions = [];
 
-    // Auto-refresh data every 30 seconds to keep dashboard live
-    const interval = setInterval(() => {
-      getFocusData().then(setData);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
-
-      .fade-up {
-        opacity: 0;
-        transform: translateY(20px);
-        transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
+    if (currentUser) {
+      try {
+        const q = query(
+          collection(db, "sessions"),
+          where("userId", "==", currentUser.uid),
+          orderBy("createdAt", "desc"),
+          limit(20)
+        );
+        const snap = await getDocs(q);
+        allSessions = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      } catch (e) {
+        console.error("Firestore Error:", e);
+        allSessions = getSessions(); // Fallback to local
       }
-      .fade-up.visible { opacity: 1; transform: translateY(0); }
-      .fade-up:nth-child(2) { transition-delay: 0.1s; }
-      .fade-up:nth-child(3) { transition-delay: 0.2s; }
-      .fade-up:nth-child(4) { transition-delay: 0.3s; }
+    } else {
+      allSessions = getSessions();
+    }
 
-      .glow-btn {
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-      }
-      .glow-btn::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 70%);
-        opacity: 0;
-        transition: opacity 0.3s;
-      }
-      .glow-btn:hover::after { opacity: 1; }
-      .glow-btn:hover { transform: translateY(-2px); }
+    setSessions(allSessions);
+    
+    // Calculate Stats
+    if (allSessions.length > 0) {
+      const avg = Math.round(allSessions.reduce((a, b) => a + (b.attentionPercent || 0), 0) / allSessions.length);
+      const dist = allSessions.reduce((a, b) => a + (b.tabSwitches || 0) + (b.noFaceAlerts || 0), 0);
+      const peak = Math.max(...allSessions.map(s => s.attentionPercent || 0));
+      
+      setStats({
+        avgAttention: avg,
+        totalSessions: allSessions.length,
+        totalDistractions: dist,
+        peakFocus: peak
+      });
+    }
+    
+    setLoading(false);
+  };
 
-      .stat-card {
-        transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
-        position: relative;
-        overflow: hidden;
-      }
-      .stat-card::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 60%);
-        opacity: 0;
-        transition: opacity 0.4s;
-      }
-      .stat-card:hover { transform: translateY(-6px); }
-      .stat-card:hover::before { opacity: 1; }
-
-      .cursor-dot {
-        width: 6px; height: 6px;
-        background: white;
-        border-radius: 50%;
-        position: fixed;
-        pointer-events: none;
-        z-index: 9999;
-        transition: transform 0.1s;
-        mix-blend-mode: difference;
-      }
-      .cursor-ring {
-        width: 32px; height: 32px;
-        border: 1px solid rgba(255,255,255,0.5);
-        border-radius: 50%;
-        position: fixed;
-        pointer-events: none;
-        z-index: 9998;
-        transition: all 0.15s ease;
-        mix-blend-mode: difference;
-      }
-    `;
-    document.head.appendChild(style);
-
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
-      { threshold: 0.1 }
-    );
-    document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
-
-    const dot = document.createElement("div");
-    dot.className = "cursor-dot";
-    const ring = document.createElement("div");
-    ring.className = "cursor-ring";
-    document.body.appendChild(dot);
-    document.body.appendChild(ring);
-
-    let mx = 0, my = 0, rx = 0, ry = 0;
-    const moveMouse = e => {
-      mx = e.clientX; my = e.clientY;
-      dot.style.left = `${mx - 3}px`;
-      dot.style.top = `${my - 3}px`;
-    };
-    const animRing = () => {
-      rx += (mx - rx - 16) * 0.12;
-      ry += (my - ry - 16) * 0.12;
-      ring.style.left = `${rx}px`;
-      ring.style.top = `${ry}px`;
-      requestAnimationFrame(animRing);
-    };
-    window.addEventListener("mousemove", moveMouse);
-    animRing();
-
-    return () => {
-      document.head.removeChild(style);
-      window.removeEventListener("mousemove", moveMouse);
-      dot.remove(); ring.remove();
-      obs.disconnect();
-    };
-  }, []);
+  const chartData = sessions.slice(0, 7).reverse().map(s => ({
+    name: s.date?.split(',')[0] || 'Session',
+    focus: s.attentionPercent || 0
+  }));
 
   return (
-    <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
+    <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", position: "relative", overflowX: "hidden" }}>
       <Noise />
-
-      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 24px 80px" }}>
-
-        {/* ── HEADER ── */}
-        <header className="fade-up" style={{ marginBottom: 64 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `0px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
-            <Sparkles size={12} />
-            WELCOME BACK, {user?.displayName ? user.displayName.split(' ')[0].toUpperCase() : "USER"}
+      
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px", position: "relative", zIndex: 1 }}>
+        
+        {/* Header */}
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 40 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: fgMuted, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8, textTransform: "uppercase" }}>
+              <LayoutDashboard size={14} /> INTELLIGENCE HUB
+            </div>
+            <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, letterSpacing: 1, margin: 0 }}>
+              WELCOME BACK, <span style={{ WebkitTextStroke: `1px ${fg}`, color: "transparent" }}>{user?.displayName?.split(' ')[0] || "OPERATOR"}</span>
+            </h1>
           </div>
-          <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(48px, 8vw, 80px)", letterSpacing: -1, lineHeight: 1, margin: 0 }}>
-            YOUR FOCUS <span style={{ WebkitTextStroke: `2px ${fg}`, color: "transparent" }}>OVERVIEW</span>
-          </h1>
+          <div style={{ textAlign: "right" }}>
+             <div style={{ fontSize: 13, color: fgMuted }}>Status</div>
+             <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14 }}>
+               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 10px #4ade80" }} /> SYSTEM ACTIVE
+             </div>
+          </div>
         </header>
 
-        {/* ── STATS GRID ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24, marginBottom: 64 }}>
-
-          <div className="stat-card fade-up" style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 20, padding: "40px 32px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", color: fg }}>
-                <Activity size={22} />
+        {/* BENTO GRID */}
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(4, 1fr)", 
+          gridAutoRows: "minmax(160px, auto)",
+          gap: 24 
+        }}>
+          
+          {/* Main Chart - Large 3x2 */}
+          <div style={{ 
+            gridColumn: "span 3", gridRow: "span 2",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: 32,
+            display: "flex", flexDirection: "column"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 32 }}>
+              <div>
+                <h3 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>Attention Flow</h3>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>Weekly Performance</div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: fgMuted, letterSpacing: 1 }}>LIVE SCORE</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600 }}>7 Days</div>
+              </div>
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 80, lineHeight: 1, marginBottom: 8 }}>
-              {data.score}
+            
+            <div style={{ flex: 1, width: "100%", minHeight: 250 }}>
+              {loading ? <Skeleton height="100%" /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorFocus" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={fg} stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor={fg} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={border} vertical={false} />
+                    <XAxis dataKey="name" stroke={fgMuted} fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke={fgMuted} fontSize={10} tickLine={false} axisLine={false} domain={[0, 100]} />
+                    <Tooltip 
+                      contentStyle={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, fontSize: 12 }}
+                      itemStyle={{ color: fg }}
+                    />
+                    <Area type="monotone" dataKey="focus" stroke={fg} strokeWidth={3} fillOpacity={1} fill="url(#colorFocus)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
-            <div style={{ fontSize: 14, color: fgMuted }}>Current Session Focus Level</div>
           </div>
 
-          <div className="stat-card fade-up" style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 20, padding: "40px 32px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", color: fg }}>
-                <LayoutDashboard size={22} />
+          {/* Stats Card - Avg Attention */}
+          <div style={{ 
+            gridColumn: "span 1",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: 24,
+            display: "flex", flexDirection: "column", justifyContent: "space-between"
+          }}>
+            <div style={{ background: "rgba(255,255,255,0.05)", width: 40, height: 40, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Zap size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Avg Focus</div>
+              <div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Bebas Neue', sans-serif" }}>
+                {loading ? <Skeleton width="60px" /> : `${stats.avgAttention}%`}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: fgMuted, letterSpacing: 1 }}>CURRENT STATE</div>
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, marginBottom: 16, height: 80, display: "flex", alignItems: "center" }}>
-              {data.state}
+          </div>
+
+          {/* Stats Card - Total Sessions */}
+          <div style={{ 
+            gridColumn: "span 1",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: 24,
+            display: "flex", flexDirection: "column", justifyContent: "space-between"
+          }}>
+            <div style={{ background: "rgba(255,255,255,0.05)", width: 40, height: 40, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <History size={20} />
             </div>
-            <div style={{ fontSize: 14, color: fgMuted }}>Activity Intelligence Detection</div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Sessions</div>
+              <div style={{ fontSize: 32, fontWeight: 800, fontFamily: "'Bebas Neue', sans-serif" }}>
+                {loading ? <Skeleton width="60px" /> : stats.totalSessions}
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Breakdown - 2x2 */}
+          <div style={{ 
+            gridColumn: "span 2", gridRow: "span 2",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: 32,
+            display: "flex", flexDirection: "column"
+          }}>
+            <h3 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 24 }}>Distraction Analytics</h3>
+            <div style={{ flex: 1 }}>
+              {loading ? <Skeleton height="100%" /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sessions.slice(0, 5).map(s => ({ name: 'S', d: (s.tabSwitches || 0) + (s.noFaceAlerts || 0) }))}>
+                    <Bar dataKey="d" radius={[4, 4, 0, 0]}>
+                      {sessions.slice(0, 5).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? fg : fgMuted} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Distraction Surge</div>
+              <p style={{ color: fgMuted, fontSize: 12, margin: 0 }}>You averaged {Math.round(stats.totalDistractions / (stats.totalSessions || 1))} distractions per session.</p>
+            </div>
+          </div>
+
+          {/* Quick Action - 2x1 */}
+          <div 
+            onClick={() => nav("/face")}
+            style={{ 
+              gridColumn: "span 2",
+              background: fg, color: bg, borderRadius: 24, padding: 32,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              cursor: "pointer", transition: "transform 0.3s cubic-bezier(0.16,1,0.3,1)"
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.02)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.6, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>Deep Work</div>
+              <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'Bebas Neue', sans-serif" }}>Start New Session</div>
+            </div>
+            <div style={{ background: bg, color: fg, width: 48, height: 48, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ArrowRight size={24} />
+            </div>
+          </div>
+
+          {/* Thoughts Card - 2x1 */}
+          <div style={{ 
+            gridColumn: "span 2",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: 32,
+            display: "flex", flexDirection: "column", justifyContent: "space-between",
+            position: "relative", overflow: "hidden"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", zIndex: 1 }}>
+              <div style={{ background: "rgba(255,255,255,0.05)", width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Quote size={16} />
+              </div>
+              <button 
+                onClick={nextThought}
+                style={{ background: "transparent", border: "none", color: fgMuted, cursor: "pointer", padding: 4 }}
+                className="rotate-hover"
+              >
+                <RefreshCw size={16} />
+              </button>
+            </div>
+            
+            <div style={{ zIndex: 1 }}>
+              <p style={{ fontSize: 16, fontWeight: 500, lineHeight: 1.5, margin: "16px 0 8px", fontStyle: "italic" }}>
+                "{thoughts[thoughtIdx].text}"
+              </p>
+              <div style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1 }}>
+                — {thoughts[thoughtIdx].author.toUpperCase()}
+              </div>
+            </div>
+
+            {/* Decorative background icon */}
+            <Quote size={80} style={{ position: "absolute", right: -10, bottom: -10, opacity: 0.03, transform: "rotate(15deg)" }} />
           </div>
 
         </div>
-
-        {/* ── QUICK ACTIONS ── */}
-        <section className="fade-up">
-          <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, letterSpacing: 1, marginBottom: 32 }}>QUICK ACTIONS</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-
-            <button className="glow-btn" onClick={() => nav("/face")} style={{
-              background: fg, color: bg, border: "none", borderRadius: 16, padding: "24px",
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
-            }}>
-              <Eye size={24} />
-              <div style={{ fontWeight: 600, fontSize: 18 }}>Start Session</div>
-              <div style={{ fontSize: 13, opacity: 0.7 }}>Enable webcam-based face tracking</div>
-              <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
-                LAUNCH <ArrowRight size={14} />
-              </div>
-            </button>
-
-            <button className="glow-btn" onClick={() => nav("/tracker")} style={{
-              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px",
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
-            }}>
-              <Zap size={24} />
-              <div style={{ fontWeight: 600, fontSize: 18 }}>App Tracker</div>
-              <div style={{ fontSize: 13, color: fgMuted }}>Review your application usage history</div>
-              <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
-                EXPLORE <ArrowRight size={14} />
-              </div>
-            </button>
-
-            <button className="glow-btn" onClick={() => nav("/ai")} style={{
-              background: cardBg, color: fg, border: `1px solid ${border}`, borderRadius: 16, padding: "24px",
-              textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 12
-            }}>
-              <Brain size={24} />
-              <div style={{ fontWeight: 600, fontSize: 18 }}>AI Insights</div>
-              <div style={{ fontSize: 13, color: fgMuted }}>Get Gemini-powered focus coaching</div>
-              <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
-                ANALYZE <ArrowRight size={14} />
-              </div>
-            </button>
-
-          </div>
-        </section>
-
       </main>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ padding: "40px 24px", borderTop: `1px solid ${border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 2 }}>ZENITH</div>
-        <div style={{ color: fgMuted, fontSize: 13 }}>© 2026 Zenith. Dashboard Interface v1.0</div>
-        <div style={{ display: "flex", gap: 24, fontSize: 13, color: fgMuted }}>
-          <span style={{ cursor: "pointer" }} onClick={() => nav("/settings")}>Settings</span>
-          <span style={{ cursor: "pointer" }} onClick={() => nav("/")}>Home</span>
-        </div>
-      </footer>
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .rotate-hover {
+          transition: all 0.5s cubic-bezier(0.16,1,0.3,1);
+        }
+        .rotate-hover:hover {
+          transform: rotate(180deg);
+          color: ${fg} !important;
+        }
+        .fade-up {
+          animation: fadeUp 0.8s cubic-bezier(0.16,1,0.3,1) forwards;
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
