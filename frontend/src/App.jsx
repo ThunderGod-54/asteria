@@ -11,7 +11,7 @@ import FaceDetection from "./pages/FaceDetection";
 import AppTracker from "./pages/AppTracker";
 import Ai from "./pages/Ai";
 import Tools from "./pages/Tools";
-import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 
 function Layout() {
   const location = useLocation();
@@ -19,10 +19,12 @@ function Layout() {
   const hideNavbar = location.pathname === "/";
 
   return (
-    <>
-      {!hideNavbar && <Navbar />}
-      <Outlet />
-    </>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      {!hideNavbar && <Sidebar />}
+      <div style={{ flex: 1, height: '100vh', overflowY: 'auto' }}>
+        <Outlet />
+      </div>
+    </div>
   );
 }
 
