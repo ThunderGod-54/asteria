@@ -301,8 +301,8 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
         <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
 
           {/* Grade Badge */}
-          <div style={{ background: fg, color: "black", padding: "12px 16px", borderRadius: 12, minWidth: 80, textAlign: "center" }}>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, lineHeight: 1 }}>{s.grade === 'Needs Improvement' ? 'NI' : s.grade.toUpperCase()}</div>
+          <div style={{ background: fg, color: "black", padding: "12px", borderRadius: 12, minWidth: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <GradeIcon grade={s.grade} size={32} />
           </div>
 
           <div style={{ flex: 1 }}>
@@ -337,14 +337,27 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
             <PillStat icon={<Shuffle size={14} />} label="IDENTIFIED" value={`${s.tabSwitches} events`} fg={fg} fgMuted={fgMuted} border={border} />
           </div>
 
-          {/* Attention Bar */}
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ color: fgMuted, fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Attention Score</span>
-              <span style={{ color: fg, fontWeight: 800, fontSize: '14px' }}>{s.attentionPercent}%</span>
+          {/* Attention Bar & Pulse Chart */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 32, marginBottom: 40 }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: fgMuted, fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Attention Score</span>
+                <span style={{ color: fg, fontWeight: 800, fontSize: '14px' }}>{s.attentionPercent}%</span>
+              </div>
+              <div style={{ height: 6, background: border, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: "100%", width: `${s.attentionPercent}%`, background: fg, borderRadius: 3 }} />
+              </div>
+              <div style={{ marginTop: 24, color: fgMuted, fontSize: 13, lineHeight: 1.5 }}>
+                Rating: <span style={{ color: fg, fontWeight: 700 }}>{s.grade}</span>. {sessionSummary(s)}
+              </div>
             </div>
-            <div style={{ height: 6, background: border, borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ height: "100%", width: `${s.attentionPercent}%`, background: fg, borderRadius: 3 }} />
+            
+            <div style={{ 
+              background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", 
+              borderRadius: 16, padding: 20, border: `1px solid ${border}` 
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: fgMuted, marginBottom: 12, letterSpacing: 1 }}>FOCUS TELEMETRY PULSE</div>
+              <FocusPulseChart data={s.pulseData || [70, 80, 65, 90, 75]} color={fg} />
             </div>
           </div>
 
@@ -422,9 +435,48 @@ function PillStat({ icon, label, value, fg, fgMuted, border }) {
 
 function GradeIcon({ grade, size = 24 }) {
   const { dark } = useTheme();
+  // Icons are rendered inside a badge which is white in dark mode (fg) and black in light mode
   const color = dark ? "#000" : "#fff";
   if (grade === 'Excellent') return <Trophy size={size} color={color} />;
   if (grade === 'Good') return <ThumbsUp size={size} color={color} />;
   if (grade === 'Fair') return <TrendingUp size={size} color={color} />;
   return <AlertTriangle size={size} color={color} />;
-}
+}
+
+function FocusPulseChart({ data, color }) {
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * 100},${100 - v}`).join(' ');
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: 60, overflow: "visible" }}>
+      <defs>
+        <linearGradient id="pulseGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path
+        d={`M 0,100 L ${points} L 100,100 Z`}
+        fill="url(#pulseGradient)"
+        style={{ transition: "all 1s ease" }}
+      />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+        style={{ transition: "all 1s ease", opacity: 0.8 }}
+      />
+      {data.map((v, i) => (
+        <circle
+          key={i}
+          cx={(i / (data.length - 1)) * 100}
+          cy={100 - v}
+          r="1.5"
+          fill={color}
+        />
+      ))}
+    </svg>
+  );
+}
+

@@ -69,7 +69,16 @@ export default function FaceDetection() {
 
   useEffect(() => {
     if (isDetecting) {
-      tickRef.current = setInterval(() => forceRender(n => n + 1), 1000);
+      let ticks = 0;
+      tickRef.current = setInterval(() => {
+        ticks++;
+        if (ticks % 30 === 0 && sessionRef.current) {
+          const s = sessionRef.current;
+          const currentPct = pct(s.faceFrames, s.faceFrames + s.noFaceAlerts);
+          s.pulse.push(currentPct);
+        }
+        forceRender(n => n + 1);
+      }, 1000);
     } else {
       clearInterval(tickRef.current);
     }
@@ -151,6 +160,7 @@ export default function FaceDetection() {
       noFaceAlerts: 0,
       tabSwitches: 0,
       totalAwayMs: 0,
+      pulse: [100],
     };
     awayEvents.current = [];
     openEvent.current = null;
@@ -191,6 +201,7 @@ export default function FaceDetection() {
       noFaceAlerts: s.noFaceAlerts,
       tabSwitches: s.tabSwitches,
       awayEvents: [...awayEvents.current],
+      pulseData: s.pulse.length > 1 ? s.pulse : [attentionPct, attentionPct, attentionPct],
       grade: attentionPct >= 85 ? 'Excellent' : attentionPct >= 65 ? 'Good' : attentionPct >= 40 ? 'Fair' : 'Needs Improvement',
     };
     saveSession(builtReport);
