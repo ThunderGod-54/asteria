@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FaceDetector } from 'face-detection-module';
+import { saveSession } from '../services/sessionStore';
+import { Trophy, ThumbsUp, TrendingUp, AlertTriangle } from 'lucide-react';
 const fmt = (d) => d.toLocaleTimeString();
 const fmtDate = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const elapsed = (ms) => {
@@ -150,10 +152,12 @@ export default function FaceDetection() {
     const focusedMs = Math.max(0, totalMs - s.totalAwayMs);
     const attentionPct = pct(s.faceFrames, s.faceFrames + s.noFaceAlerts);
 
-    setReport({
+    const builtReport = {
       date: fmtDate(s.startTime),
       startTime: fmt(s.startTime),
       endTime: fmt(now),
+      startTimeISO: s.startTime.toISOString(),
+      endTimeISO: now.toISOString(),
       totalDuration: elapsed(totalMs),
       focusedTime: elapsed(focusedMs),
       awayTime: elapsed(s.totalAwayMs),
@@ -162,7 +166,9 @@ export default function FaceDetection() {
       tabSwitches: s.tabSwitches,
       awayEvents: [...awayEvents.current],
       grade: attentionPct >= 85 ? 'Excellent' : attentionPct >= 65 ? 'Good' : attentionPct >= 40 ? 'Fair' : 'Needs Improvement',
-    });
+    };
+    saveSession(builtReport);
+    setReport(builtReport);
 
     sessionRef.current = null;
     setSessionData(null);
@@ -233,10 +239,15 @@ export default function FaceDetection() {
             <h3 style={S.cardTitle}>System Status</h3>
             <div style={{
               ...S.badge,
-              backgroundColor:
-                status === 'Idle' ? '#444' :
-                  status === 'Initializing...' ? '#f59f00' :
-                    status === 'Face Detected' ? '#2b8a3e' : '#e03131'
+              backgroundColor: '#111',
+              borderColor:
+                status === 'Idle'            ? '#333' :
+                status === 'Initializing...' ? '#555' :
+                status === 'Face Detected'   ? '#fff' : '#666',
+              color:
+                status === 'Idle'            ? '#555' :
+                status === 'Initializing...' ? '#aaa' :
+                status === 'Face Detected'   ? '#fff' : '#aaa',
             }}>
               {status}
             </div>
@@ -272,10 +283,10 @@ export default function FaceDetection() {
                 {logs.map((log, i) => (
                   <li key={i} style={{
                     ...S.logItem,
-                    borderLeftColor: log.type === 'error' ? '#e03131' : log.type === 'warn' ? '#f59f00' : log.type === 'success' ? '#2b8a3e' : '#444'
+                    borderLeftColor: log.type === 'error' ? '#555' : log.type === 'warn' ? '#444' : log.type === 'success' ? '#fff' : '#222'
                   }}>
                     <span style={S.logTime}>[{log.time}]</span>
-                    <span style={{ color: log.type === 'error' ? '#ff8787' : log.type === 'warn' ? '#ffd43b' : log.type === 'success' ? '#8ce99a' : '#e9ecef' }}>
+                    <span style={{ color: log.type === 'error' ? '#aaa' : log.type === 'warn' ? '#888' : log.type === 'success' ? '#fff' : '#666' }}>
                       {log.message}
                     </span>
                   </li>
@@ -291,7 +302,7 @@ export default function FaceDetection() {
   );
 }
 function StatItem({ label, value, highlight }) {
-  const color = highlight === 'green' ? '#8ce99a' : highlight === 'yellow' ? '#ffd43b' : highlight === 'red' ? '#ff8787' : '#e9ecef';
+  const color = highlight === 'green' ? '#fff' : highlight === 'yellow' ? '#ccc' : highlight === 'red' ? '#888' : '#fff';
   return (
     <div style={S.statItem}>
       <span style={S.statLabel}>{label}</span>
@@ -301,46 +312,42 @@ function StatItem({ label, value, highlight }) {
 }
 
 function AttentionBar({ pct: p }) {
-  const color = p >= 75 ? '#2b8a3e' : p >= 50 ? '#f59f00' : '#e03131';
   return (
     <div style={{ marginTop: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-        <span style={{ color: '#adb5bd', fontSize: '0.85rem' }}>Attention Score</span>
-        <span style={{ color, fontWeight: 700 }}>{p}%</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <span style={{ color: '#444', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Attention Score</span>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.88rem' }}>{p}%</span>
       </div>
       <div style={S.barBg}>
-        <div style={{ ...S.barFill, width: `${p}%`, backgroundColor: color }} />
+        <div style={{ ...S.barFill, width: `${p}%` }} />
       </div>
     </div>
   );
 }
 
 function SessionReport({ report }) {
-  const gradeColor = report.grade === 'Excellent' ? '#8ce99a' : report.grade === 'Good' ? '#74c0fc' : report.grade === 'Fair' ? '#ffd43b' : '#ff8787';
+  const gc = report.grade === 'Excellent' ? '#fff' : report.grade === 'Good' ? '#ccc' : report.grade === 'Fair' ? '#999' : '#666';
 
   return (
     <div style={S.reportContainer}>
-      <h2 style={S.reportTitle}>📋 Session Report</h2>
-      <p style={{ color: '#868e96', margin: '0 0 1.5rem 0' }}>{report.date}</p>
-      <div style={{ ...S.gradeBanner, borderColor: gradeColor }}>
-        <span style={{ fontSize: '2rem' }}>
-          {report.grade === 'Excellent' ? '🏆' : report.grade === 'Good' ? '👍' : report.grade === 'Fair' ? '📈' : '⚠️'}
-        </span>
+      <h2 style={S.reportTitle}>Session Report</h2>
+      <p style={{ color: '#444', margin: '0 0 1.5rem 0', fontSize: '0.85rem' }}>{report.date}</p>
+      <div style={{ ...S.gradeBanner, borderColor: '#2a2a2a' }}>
+        <GradeIconReport grade={report.grade} />
         <div>
-          <div style={{ color: gradeColor, fontWeight: 800, fontSize: '1.4rem' }}>{report.grade}</div>
-          <div style={{ color: '#adb5bd', fontSize: '0.9rem' }}>Overall attention rating</div>
+          <div style={{ color: gc, fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.3px' }}>{report.grade}</div>
+          <div style={{ color: '#555', fontSize: '0.85rem' }}>Overall attention rating</div>
         </div>
       </div>
       <div style={S.reportGrid}>
-        <ReportCard icon="🕐" label="Start Time" value={report.startTime} />
-        <ReportCard icon="🕔" label="End Time" value={report.endTime} />
-        <ReportCard icon="⏱" label="Total Duration" value={report.totalDuration} />
-        <ReportCard icon="🎯" label="Focused Time" value={report.focusedTime} />
-        <ReportCard icon="🚶" label="Away Time" value={report.awayTime} />
-        <ReportCard icon="👁" label="Attention %" value={`${report.attentionPercent}%`}
-          highlight={report.attentionPercent >= 75 ? '#8ce99a' : report.attentionPercent >= 50 ? '#ffd43b' : '#ff8787'} />
-        <ReportCard icon="🔔" label="No-Face Alerts" value={report.noFaceAlerts} />
-        <ReportCard icon="🔀" label="Distractions" value={report.tabSwitches} />
+        <ReportCard label="Start Time"     value={report.startTime} />
+        <ReportCard label="End Time"       value={report.endTime} />
+        <ReportCard label="Total Duration" value={report.totalDuration} />
+        <ReportCard label="Focused Time"   value={report.focusedTime} />
+        <ReportCard label="Away Time"      value={report.awayTime} />
+        <ReportCard label="Attention"      value={`${report.attentionPercent}%`} bright />
+        <ReportCard label="No-Face Alerts" value={report.noFaceAlerts} />
+        <ReportCard label="Distractions"   value={report.tabSwitches} />
       </div>
 
       <div style={{ marginBottom: '2rem' }}>
@@ -348,7 +355,7 @@ function SessionReport({ report }) {
       </div>
       {report.awayEvents.length > 0 && (
         <div style={S.timelineSection}>
-          <h3 style={S.cardTitle}>🗂 Distraction Log</h3>
+          <h3 style={S.cardTitle}>Distraction Log</h3>
           <div style={S.tableWrapper}>
             <table style={S.table}>
               <thead>
@@ -363,22 +370,19 @@ function SessionReport({ report }) {
               </thead>
               <tbody>
                 {report.awayEvents.map((ev, i) => (
-                  <tr key={ev.id} style={{ backgroundColor: i % 2 === 0 ? '#25262b' : '#1e1f23' }}>
+                  <tr key={ev.id} style={{ backgroundColor: i % 2 === 0 ? '#111' : '#0a0a0a' }}>
                     <td style={S.td}>{i + 1}</td>
                     <td style={S.td}>
-                      <span style={{
-                        ...S.typePill,
-                        backgroundColor: ev.kind === 'tab' ? '#1864ab' : '#862e9c'
-                      }}>
-                        {ev.kind === 'tab' ? '🗂 Tab' : '🖥 App/Min'}
+                      <span style={S.typePill}>
+                        {ev.kind === 'tab' ? 'Tab' : 'App'}
                       </span>
                     </td>
-                    <td style={{ ...S.td, color: '#adb5bd', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...S.td, color: '#555', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {ev.label}
                     </td>
                     <td style={S.td}>{fmt(ev.startTime)}</td>
                     <td style={S.td}>{ev.endTime ? fmt(ev.endTime) : '—'}</td>
-                    <td style={{ ...S.td, color: ev.durationMs > 30000 ? '#ff8787' : ev.durationMs > 10000 ? '#ffd43b' : '#8ce99a', fontWeight: 700 }}>
+                    <td style={{ ...S.td, color: ev.durationMs > 30000 ? '#888' : '#fff', fontWeight: 700 }}>
                       {ev.durationMs ? elapsed(ev.durationMs) : '—'}
                     </td>
                   </tr>
@@ -389,12 +393,12 @@ function SessionReport({ report }) {
         </div>
       )}
       <div style={S.insightsSection}>
-        <h3 style={S.cardTitle}>💡 Insights</h3>
-        <ul style={{ margin: 0, padding: '0 0 0 1.2rem', color: '#adb5bd', lineHeight: '1.9' }}>
-          {report.attentionPercent >= 85 && <li>Great focus — you maintained strong attention throughout the session.</li>}
+        <h3 style={S.cardTitle}>Insights</h3>
+        <ul style={{ margin: 0, padding: '0 0 0 1.2rem', color: '#666', lineHeight: '1.9', fontSize: '0.9rem' }}>
+          {report.attentionPercent >= 85 && <li style={{ color: '#fff' }}>Great focus — you maintained strong attention throughout the session.</li>}
           {report.attentionPercent < 85 && report.attentionPercent >= 65 && <li>Good session. A few attention dips — try minimizing distractions.</li>}
           {report.attentionPercent < 65 && <li>Attention was low. Consider shorter sessions with breaks.</li>}
-          {report.tabSwitches === 0 && <li>Zero distractions — excellent focus environment!</li>}
+          {report.tabSwitches === 0 && <li style={{ color: '#fff' }}>Zero distractions — excellent focus environment!</li>}
           {report.tabSwitches > 0 && report.tabSwitches <= 3 && <li>Minimal distractions ({report.tabSwitches}) — good discipline.</li>}
           {report.tabSwitches > 3 && <li>You left the session {report.tabSwitches} times — try closing other apps before starting.</li>}
           {report.awayEvents.some(e => e.durationMs > 60000) && <li>At least one distraction lasted over a minute — consider using Do Not Disturb mode.</li>}
@@ -405,13 +409,20 @@ function SessionReport({ report }) {
   );
 }
 
-function ReportCard({ icon, label, value, highlight }) {
+function GradeIconReport({ grade }) {
+  const c = grade === 'Excellent' ? '#fff' : grade === 'Good' ? '#ccc' : grade === 'Fair' ? '#999' : '#666';
+  if (grade === 'Excellent') return <Trophy        size={28} color={c} />;
+  if (grade === 'Good')      return <ThumbsUp      size={28} color={c} />;
+  if (grade === 'Fair')      return <TrendingUp    size={28} color={c} />;
+  return                            <AlertTriangle size={28} color={c} />;
+}
+
+function ReportCard({ label, value, bright = false }) {
   return (
     <div style={S.reportCard}>
-      <span style={{ fontSize: '1.4rem' }}>{icon}</span>
       <div>
-        <div style={{ color: '#868e96', fontSize: '0.8rem', marginBottom: '2px' }}>{label}</div>
-        <div style={{ color: highlight || '#e9ecef', fontWeight: 700, fontSize: '1.05rem' }}>{value}</div>
+        <div style={{ color: '#444', fontSize: '0.7rem', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</div>
+        <div style={{ color: bright ? '#fff' : '#aaa', fontWeight: 700, fontSize: '1rem' }}>{value}</div>
       </div>
     </div>
   );
@@ -420,104 +431,104 @@ const S = {
   container: {
     padding: '2rem', maxWidth: '1200px', margin: '0 auto',
     fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
-    minHeight: '100vh', color: '#e9ecef',
+    minHeight: '100vh', color: '#fff', backgroundColor: '#000',
   },
-  header: { marginBottom: '2rem', borderBottom: '1px solid #333', paddingBottom: '1.5rem' },
+  header: { marginBottom: '2rem', borderBottom: '1px solid #222', paddingBottom: '1.5rem' },
   title: {
-    fontSize: '2.5rem', margin: '0 0 0.5rem 0',
-    background: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '800',
+    fontSize: '2.2rem', margin: '0 0 0.4rem 0', fontWeight: 800,
+    color: '#fff', letterSpacing: '-0.5px',
   },
-  desc: { color: '#adb5bd', margin: 0, fontSize: '1.05rem', lineHeight: '1.5' },
+  desc: { color: '#666', margin: 0, fontSize: '1rem', lineHeight: '1.6' },
   controls: { marginBottom: '2rem', display: 'flex', justifyContent: 'center' },
   startBtn: {
-    backgroundColor: '#1c7ed6', color: '#fff', border: 'none',
-    padding: '14px 32px', fontSize: '1.1rem', borderRadius: '50px',
-    cursor: 'pointer', fontWeight: '600', boxShadow: '0 4px 15px rgba(28,126,214,0.4)',
+    backgroundColor: '#fff', color: '#000', border: 'none',
+    padding: '13px 36px', fontSize: '1rem', borderRadius: '50px',
+    cursor: 'pointer', fontWeight: '700', letterSpacing: '0.3px',
   },
   stopBtn: {
-    backgroundColor: '#fa5252', color: '#fff', border: 'none',
-    padding: '14px 32px', fontSize: '1.1rem', borderRadius: '50px',
-    cursor: 'pointer', fontWeight: '600', boxShadow: '0 4px 15px rgba(250,82,82,0.4)',
+    backgroundColor: 'transparent', color: '#fff', border: '1px solid #555',
+    padding: '13px 36px', fontSize: '1rem', borderRadius: '50px',
+    cursor: 'pointer', fontWeight: '700', letterSpacing: '0.3px',
   },
   content: { display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' },
   videoSection: { flex: '1 1 auto', maxWidth: '640px', display: 'flex', justifyContent: 'center' },
   detectorWrapper: {
-    borderRadius: '16px', overflow: 'hidden',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.5)', border: '2px solid #2b2b2b', backgroundColor: '#000',
+    borderRadius: '12px', overflow: 'hidden',
+    border: '1px solid #222', backgroundColor: '#000',
   },
   placeholder: {
-    width: '100%', maxWidth: '640px', aspectRatio: '4/3', backgroundColor: '#111',
-    borderRadius: '16px', display: 'flex', flexDirection: 'column',
+    width: '100%', maxWidth: '640px', aspectRatio: '4/3', backgroundColor: '#0a0a0a',
+    borderRadius: '12px', display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    color: '#666', border: '2px dashed #333', fontSize: '1.1rem',
+    color: '#333', border: '1px dashed #222', fontSize: '1rem',
   },
-  placeholderIcon: { fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 },
-  infoSection: { flex: '1 1 340px', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '1.25rem' },
+  placeholderIcon: { fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.3 },
+  infoSection: { flex: '1 1 340px', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '1rem' },
   card: {
-    backgroundColor: '#1a1b1e', padding: '1.25rem',
-    borderRadius: '16px', border: '1px solid #2c2e33', boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+    backgroundColor: '#0f0f0f', padding: '1.25rem',
+    borderRadius: '12px', border: '1px solid #222',
   },
-  cardTitle: { margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#f8f9fa', fontWeight: '600' },
+  cardTitle: { margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#555', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.8px' },
   badge: {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    padding: '8px 18px', borderRadius: '30px', fontWeight: '700',
-    fontSize: '1rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px',
+    padding: '8px 20px', borderRadius: '30px', fontWeight: '700',
+    fontSize: '0.88rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px',
+    border: '1px solid #333',
   },
   awayBanner: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#3b1212', border: '1px solid #e03131', borderRadius: '10px',
-    padding: '0.6rem 1rem', marginBottom: '1rem', color: '#ff8787', fontSize: '0.9rem',
+    backgroundColor: '#111', border: '1px solid #444', borderRadius: '8px',
+    padding: '0.6rem 1rem', marginBottom: '1rem', color: '#fff', fontSize: '0.88rem',
   },
-  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' },
+  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' },
   statItem: {
-    backgroundColor: '#25262b', borderRadius: '10px', padding: '0.75rem 1rem',
-    display: 'flex', flexDirection: 'column', gap: '2px',
+    backgroundColor: '#111', borderRadius: '8px', padding: '0.75rem 1rem',
+    display: 'flex', flexDirection: 'column', gap: '3px', border: '1px solid #1e1e1e',
   },
-  statLabel: { color: '#868e96', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  statValue: { color: '#e9ecef', fontWeight: '700', fontSize: '1.05rem' },
-  barBg: { height: '10px', backgroundColor: '#25262b', borderRadius: '99px', overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: '99px', transition: 'width 0.5s ease' },
-  logList: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+  statLabel: { color: '#444', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.6px' },
+  statValue: { color: '#fff', fontWeight: '700', fontSize: '1rem' },
+  barBg: { height: '4px', backgroundColor: '#1e1e1e', borderRadius: '99px', overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: '99px', backgroundColor: '#fff', transition: 'width 0.5s ease' },
+  logList: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' },
   logItem: {
-    fontSize: '0.88rem', padding: '8px 10px', backgroundColor: '#25262b',
-    borderRadius: '8px', display: 'flex', gap: '0.6rem', alignItems: 'center', borderLeft: '3px solid #444',
+    fontSize: '0.82rem', padding: '7px 10px', backgroundColor: '#111',
+    borderRadius: '7px', display: 'flex', gap: '0.6rem', alignItems: 'center',
+    borderLeft: '2px solid #222',
   },
-  logTime: { color: '#868e96', fontFamily: '"Fira Code", monospace', fontSize: '0.8rem', whiteSpace: 'nowrap' },
+  logTime: { color: '#444', fontFamily: '"Fira Code", monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' },
 
   reportContainer: {
-    marginTop: '3rem', backgroundColor: '#1a1b1e', borderRadius: '20px',
-    border: '1px solid #2c2e33', padding: '2rem', boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+    marginTop: '3rem', backgroundColor: '#0f0f0f', borderRadius: '16px',
+    border: '1px solid #222', padding: '2rem',
   },
   reportTitle: {
-    margin: '0 0 0.25rem 0', fontSize: '1.8rem', fontWeight: '800',
-    background: 'linear-gradient(90deg, #4facfe, #00f2fe)',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    margin: '0 0 0.25rem 0', fontSize: '1.6rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px',
   },
   gradeBanner: {
-    display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#25262b',
-    borderRadius: '14px', padding: '1rem 1.5rem', marginBottom: '1.5rem', border: '2px solid',
+    display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#111',
+    borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '1.5rem', border: '1px solid #2a2a2a',
   },
   reportGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: '1rem', marginBottom: '1.5rem',
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+    gap: '0.75rem', marginBottom: '1.5rem',
   },
   reportCard: {
-    backgroundColor: '#25262b', borderRadius: '12px', padding: '1rem',
-    display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #333',
+    backgroundColor: '#111', borderRadius: '10px', padding: '1rem',
+    display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #1e1e1e',
   },
   timelineSection: { marginBottom: '1.5rem' },
-  tableWrapper: { overflowX: 'auto', borderRadius: '12px', border: '1px solid #333' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' },
+  tableWrapper: { overflowX: 'auto', borderRadius: '10px', border: '1px solid #222' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' },
   th: {
-    padding: '10px 14px', textAlign: 'left', color: '#868e96',
-    backgroundColor: '#1e1f23', fontWeight: '600', fontSize: '0.8rem',
-    textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap',
+    padding: '10px 14px', textAlign: 'left', color: '#444',
+    backgroundColor: '#0a0a0a', fontWeight: '600', fontSize: '0.72rem',
+    textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap',
   },
-  td: { padding: '10px 14px', color: '#e9ecef', verticalAlign: 'middle' },
+  td: { padding: '10px 14px', color: '#fff', verticalAlign: 'middle' },
   typePill: {
     display: 'inline-block', padding: '3px 10px', borderRadius: '99px',
-    fontSize: '0.78rem', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap',
+    fontSize: '0.75rem', fontWeight: '600', color: '#fff',
+    backgroundColor: '#222', border: '1px solid #333', whiteSpace: 'nowrap',
   },
-  insightsSection: { backgroundColor: '#25262b', borderRadius: '12px', padding: '1.25rem', border: '1px solid #333' },
+  insightsSection: { backgroundColor: '#111', borderRadius: '10px', padding: '1.25rem', border: '1px solid #1e1e1e' },
 };
