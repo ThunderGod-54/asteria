@@ -1,8 +1,15 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { FaceDetector } from 'face-detection-module';
 import { saveSession } from '../services/sessionStore';
-import { Trophy, ThumbsUp, TrendingUp, AlertTriangle } from 'lucide-react';
-const fmt = (d) => d.toLocaleTimeString();
+import { 
+  Trophy, ThumbsUp, TrendingUp, AlertTriangle, 
+  Sparkles, Play, Square, Activity, Clock, Eye, 
+  Shuffle, Brain, ArrowRight, Shield, Zap, Info,
+  History, BarChart2, Calendar, Target, MousePointer2
+} from 'lucide-react';
+import { useTheme } from "../Theme";
+
+const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const fmtDate = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const elapsed = (ms) => {
   if (ms <= 0) return '0s';
@@ -20,7 +27,17 @@ const newAwayEvent = (kind, label) => ({
   startTime: new Date(), endTime: null, durationMs: null,
 });
 
+const Noise = () => (
+  <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.04 }}>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
+
 export default function FaceDetection() {
+  const { dark } = useTheme();
   const [isDetecting, setIsDetecting] = useState(false);
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('Idle');
@@ -32,13 +49,20 @@ export default function FaceDetection() {
   const awayEvents = useRef([]);
   const openEvent = useRef(null);
   const tickRef = useRef(null);
-  const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')); // Premium notification sound
+  const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
 
+  const bg = dark ? "#080808" : "#F5F5F0";
+  const fg = dark ? "#FFFFFF" : "#0A0A0A";
+  const fgMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
+  const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
   const addLog = useCallback((message, type = 'info') => {
-    const time = new Date().toLocaleTimeString();
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs(prev => [{ time, message, type }, ...prev].slice(0, 12));
   }, []);
+
   useEffect(() => {
     if (isDetecting) {
       tickRef.current = setInterval(() => forceRender(n => n + 1), 1000);
@@ -48,19 +72,17 @@ export default function FaceDetection() {
     return () => clearInterval(tickRef.current);
   }, [isDetecting]);
 
-
   useEffect(() => {
     if (!isDetecting) return;
 
-
     const goAway = (kind, label) => {
-
       if (openEvent.current) return;
       const ev = newAwayEvent(kind, label);
       openEvent.current = ev;
       if (sessionRef.current) sessionRef.current.tabSwitches += 1;
       addLog(`🔴 ${label}`, 'warn');
     };
+
     const comeBack = (returnLabel) => {
       if (!openEvent.current) return;
       const ev = openEvent.current;
@@ -72,7 +94,6 @@ export default function FaceDetection() {
       addLog(`🟢 ${returnLabel} (away ${elapsed(ev.durationMs)})`, 'info');
     };
 
-
     const onVisChange = () => {
       if (document.hidden) {
         goAway('tab', `Tab hidden — "${document.title}"`);
@@ -80,6 +101,7 @@ export default function FaceDetection() {
         comeBack('Tab visible again');
       }
     };
+
     const onBlur = () => {
       if (!document.hidden) {
         goAway('minimize', 'Window minimized / app switched');
@@ -111,12 +133,12 @@ export default function FaceDetection() {
     setStatus('No Face Detected!');
     if (sessionRef.current) {
       sessionRef.current.noFaceAlerts += 1;
-      // Play alert sound
       alertAudio.current.currentTime = 0;
-      alertAudio.current.play().catch(e => console.log("Audio play blocked by browser", e));
+      alertAudio.current.play().catch(e => console.log("Audio play blocked", e));
     }
     addLog('⚠️ No face detected!', 'error');
   }, [addLog]);
+
   const startSession = () => {
     const now = new Date();
     sessionRef.current = {
@@ -176,6 +198,7 @@ export default function FaceDetection() {
     addLog('Session ended', 'info');
     setIsDetecting(false);
   };
+
   const liveStats = (() => {
     const s = sessionRef.current;
     if (!s) return null;
@@ -184,6 +207,7 @@ export default function FaceDetection() {
     const liveAway = openEvent.current ? now - openEvent.current.startTime : 0;
     const awayMs = s.totalAwayMs + liveAway;
     return {
+      startTime: s.startTime,
       duration: elapsed(totalMs),
       attentionPct: pct(s.faceFrames, s.faceFrames + s.noFaceAlerts),
       tabSwitches: s.tabSwitches,
@@ -195,340 +219,466 @@ export default function FaceDetection() {
     };
   })();
 
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
+      }
+      .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+      .glow-btn {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+      .glow-btn::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .glow-btn:hover::after { opacity: 1; }
+      .glow-btn:hover { transform: translateY(-2px); }
+
+      .premium-card {
+        transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+        position: relative;
+        overflow: hidden;
+      }
+      .premium-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 60%);
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      .premium-card:hover::before { opacity: 1; }
+
+      .cursor-dot {
+        width: 6px; height: 6px;
+        background: white;
+        border-radius: 50%;
+        position: fixed;
+        pointer-events: none;
+        zIndex: 9999;
+        transition: transform 0.1s;
+        mix-blend-mode: difference;
+      }
+      .cursor-ring {
+        width: 32px; height: 32px;
+        border: 1px solid rgba(255,255,255,0.5);
+        border-radius: 50%;
+        position: fixed;
+        pointer-events: none;
+        zIndex: 9998;
+        transition: all 0.15s ease;
+        mix-blend-mode: difference;
+      }
+
+      .insight-item {
+        position: relative;
+        padding-left: 20px;
+        margin-bottom: 12px;
+      }
+      .insight-item::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        color: ${fgMuted};
+      }
+    `;
+    document.head.appendChild(style);
+
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
+
+    const dot = document.createElement("div");
+    dot.className = "cursor-dot";
+    const ring = document.createElement("div");
+    ring.className = "cursor-ring";
+    document.body.appendChild(dot);
+    document.body.appendChild(ring);
+
+    let mx = 0, my = 0, rx = 0, ry = 0;
+    const moveMouse = e => {
+      mx = e.clientX; my = e.clientY;
+      dot.style.left = `${mx - 3}px`;
+      dot.style.top = `${my - 3}px`;
+    };
+    const animRing = () => {
+      rx += (mx - rx - 16) * 0.12;
+      ry += (my - ry - 16) * 0.12;
+      ring.style.left = `${rx}px`;
+      ring.style.top = `${ry}px`;
+      requestAnimationFrame(animRing);
+    };
+    window.addEventListener("mousemove", moveMouse);
+    animRing();
+
+    return () => {
+      document.head.removeChild(style);
+      window.removeEventListener("mousemove", moveMouse);
+      dot.remove(); ring.remove();
+      obs.disconnect();
+    };
+  }, [fgMuted]);
+
   return (
-    <div style={S.container}>
-      <div style={S.header}>
-        <h1 style={S.title}>Face Detection System</h1>
-        <p style={S.desc}>
-          Tracks your attention in real-time — tab switches, app switches, and window minimizes are all recorded.
-        </p>
-      </div>
+    <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
+      <Noise />
 
-      <div style={S.controls}>
-        <button
-          style={isDetecting ? S.stopBtn : S.startBtn}
-          onClick={isDetecting ? stopSession : startSession}
-        >
-          {isDetecting ? '⏹ Stop & Get Report' : '▶ Start Session'}
-        </button>
-      </div>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px 80px" }}>
+        
+        {/* ── HEADER ── */}
+        <header className="fade-up" style={{ marginBottom: 48 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
+            <Activity size={12} />
+            REAL-TIME ATTENTION TRACKING
+          </div>
+          <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(40px, 6vw, 64px)", letterSpacing: -0.5, lineHeight: 1.1, margin: 0 }}>
+            ZENITH <span style={{ WebkitTextStroke: `1px ${fg}`, color: "transparent" }}>FOCUS</span> MONITOR
+          </h1>
+          <p style={{ color: fgMuted, fontSize: 16, maxWidth: 600, marginTop: 12, lineHeight: 1.5 }}>
+            Advanced computer vision monitoring. Tracking focus levels, tab switches, and app minimizes in real-time.
+          </p>
+        </header>
 
-      <div style={S.content}>
-        <div style={S.videoSection}>
-          {isDetecting ? (
-            <div style={S.detectorWrapper}>
-              <FaceDetector
-                width={640}
-                height={480}
-                noFaceGrace={1000}
-                alertOnNoFace={true}
-                onFaceDetected={handleFaceDetected}
-                onNoFace={handleNoFace}
-              />
-            </div>
-          ) : (
-            <div style={S.placeholder}>
-              <div style={S.placeholderIcon}>📷</div>
-              <p>Camera offline</p>
-            </div>
-          )}
+        {/* ── CONTROLS ── */}
+        <div className="fade-up" style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 48 }}>
+          <button 
+            className="glow-btn" 
+            onClick={isDetecting ? stopSession : startSession}
+            style={{ 
+              background: isDetecting ? "transparent" : fg, 
+              color: isDetecting ? fg : bg, 
+              border: isDetecting ? `1px solid ${border}` : "none",
+              borderRadius: 14, padding: "16px 32px", fontSize: 15, fontWeight: 700, 
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+            }}
+          >
+            {isDetecting ? (
+              <>
+                <Square size={16} fill="currentColor" /> Stop & Get Report
+              </>
+            ) : (
+              <>
+                <Play size={16} fill="currentColor" /> Start New Session
+              </>
+            )}
+          </button>
+          
+          <div style={{ 
+            display: "flex", alignItems: "center", gap: 12, padding: "0 24px",
+            background: cardBg, borderRadius: 14, border: `1px solid ${border}`,
+            fontSize: 14, color: fgMuted
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: status === 'Face Detected' ? "#4ade80" : "#fbbf24" }} />
+            <span style={{ fontWeight: 600, color: fg }}>{status}</span>
+          </div>
         </div>
 
-        <div style={S.infoSection}>
-          <div style={S.card}>
-            <h3 style={S.cardTitle}>System Status</h3>
-            <div style={{
-              ...S.badge,
-              backgroundColor: '#111',
-              borderColor:
-                status === 'Idle'            ? '#333' :
-                status === 'Initializing...' ? '#555' :
-                status === 'Face Detected'   ? '#fff' : '#666',
-              color:
-                status === 'Idle'            ? '#555' :
-                status === 'Initializing...' ? '#aaa' :
-                status === 'Face Detected'   ? '#fff' : '#aaa',
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 32, alignItems: "start" }}>
+          
+          {/* ── CAMERA FEED ── */}
+          <div className="fade-up">
+            <div className="premium-card" style={{ 
+              borderRadius: 24, overflow: "hidden", 
+              border: `1px solid ${border}`, background: "#000",
+              aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center",
+              position: "relative"
             }}>
-              {status}
-            </div>
-          </div>
-          {isDetecting && liveStats && (
-            <div style={{ ...S.card, border: liveStats.currentlyAway ? '1px solid #e03131' : '1px solid #2c2e33' }}>
-              <h3 style={S.cardTitle}>📊 Live Session Stats</h3>
-              {liveStats.currentlyAway && (
-                <div style={S.awayBanner}>
-                  <span>🔴 Away: {liveStats.awayLabel}</span>
-                  <span style={{ fontWeight: 700 }}>{liveStats.liveAwayTime}</span>
+              {isDetecting ? (
+                <FaceDetector
+                  width={640}
+                  height={480}
+                  noFaceGrace={1000}
+                  alertOnNoFace={true}
+                  onFaceDetected={handleFaceDetected}
+                  onNoFace={handleNoFace}
+                />
+              ) : (
+                <div style={{ textAlign: "center", color: fgMuted }}>
+                  <Eye size={40} style={{ marginBottom: 16, opacity: 0.15 }} />
+                  <p style={{ fontSize: 13, fontWeight: 600, letterSpacing: 1 }}>SYSTEM IDLE</p>
                 </div>
               )}
 
-              <div style={S.statsGrid}>
-                <StatItem label="Started" value={sessionData?.startTime ? fmt(sessionData.startTime) : '—'} />
-                <StatItem label="Duration" value={liveStats.duration} />
-                <StatItem label="Attention" value={`${liveStats.attentionPct}%`}
-                  highlight={liveStats.attentionPct >= 75 ? 'green' : liveStats.attentionPct >= 50 ? 'yellow' : 'red'} />
-                <StatItem label="Away Time" value={liveStats.awayTime} />
-                <StatItem label="Distractions" value={liveStats.tabSwitches} />
-                <StatItem label="No-Face Alerts" value={liveStats.noFaceAlerts} />
-              </div>
-              <AttentionBar pct={liveStats.attentionPct} />
-            </div>
-          )}
-          <div style={{ ...S.card, flex: 1, minHeight: '200px' }}>
-            <h3 style={S.cardTitle}>Recent Activity</h3>
-            {logs.length === 0 ? (
-              <p style={{ color: '#888', margin: 0 }}>No activity yet.</p>
-            ) : (
-              <ul style={S.logList}>
-                {logs.map((log, i) => (
-                  <li key={i} style={{
-                    ...S.logItem,
-                    borderLeftColor: log.type === 'error' ? '#555' : log.type === 'warn' ? '#444' : log.type === 'success' ? '#fff' : '#222'
+              {isDetecting && liveStats?.currentlyAway && (
+                <div style={{
+                  position: "absolute", inset: 0, 
+                  background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  zIndex: 20, textAlign: "center", padding: 32
+                }}>
+                  <Zap size={48} color="#fbbf24" style={{ marginBottom: 20 }} />
+                  <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, margin: 0, color: "#fff" }}>DISTRACTION</h3>
+                  <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, marginTop: 8 }}>{liveStats.awayLabel}</p>
+                  <div style={{ 
+                    marginTop: 24, background: "#fff", color: "#000", 
+                    padding: "8px 24px", borderRadius: 999, fontWeight: 800, fontSize: 16
                   }}>
-                    <span style={S.logTime}>[{log.time}]</span>
-                    <span style={{ color: log.type === 'error' ? '#aaa' : log.type === 'warn' ? '#888' : log.type === 'success' ? '#fff' : '#666' }}>
-                      {log.message}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                    {liveStats.liveAwayTime}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Camera Accents */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, padding: "0 8px" }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ width: 4, height: 4, borderRadius: "50%", background: fgMuted }} />
+                <div style={{ width: 4, height: 4, borderRadius: "50%", background: fgMuted }} />
+              </div>
+              <div style={{ fontSize: 10, fontFamily: "monospace", color: fgMuted }}>REC // ATTENTION_STREAM</div>
+            </div>
+          </div>
+
+          {/* ── LIVE DATA ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+            
+            {/* Live Metrics Grid */}
+            <div className="premium-card fade-up" style={{ 
+              background: cardBg, border: `1px solid ${border}`, 
+              borderRadius: 24, padding: 32 
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, margin: 0 }}>LIVE SESSION</h3>
+                {isDetecting && <div style={{ fontSize: 12, fontWeight: 800, color: fgMuted }}>{liveStats?.duration}</div>}
+              </div>
+
+              {!isDetecting ? (
+                <div style={{ padding: "20px 0", textAlign: "center", color: fgMuted }}>
+                  <p style={{ fontSize: 14 }}>Start a session to view real-time intelligence.</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <LiveStatCard label="STARTED" value={fmt(liveStats.startTime)} icon={<Calendar size={14}/>} />
+                    <LiveStatCard label="DURATION" value={liveStats.duration} icon={<Clock size={14}/>} />
+                    <LiveStatCard label="ATTENTION" value={`${liveStats.attentionPct}%`} icon={<Brain size={14}/>} 
+                      color={liveStats.attentionPct >= 75 ? "#4ade80" : liveStats.attentionPct >= 50 ? "#fbbf24" : "#f87171"} />
+                    <LiveStatCard label="AWAY TIME" value={liveStats.awayTime} icon={<Zap size={14}/>} />
+                    <LiveStatCard label="DISTRACTIONS" value={liveStats.tabSwitches} icon={<Shuffle size={14}/>} />
+                    <LiveStatCard label="ALERTS" value={liveStats.noFaceAlerts} icon={<AlertTriangle size={14}/>} />
+                  </div>
+
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 12 }}>
+                      <span style={{ color: fgMuted, fontWeight: 600 }}>FOCUS PERFORMANCE</span>
+                      <span style={{ fontWeight: 800 }}>{liveStats.attentionPct}%</span>
+                    </div>
+                    <div style={{ height: 6, background: border, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ 
+                        height: "100%", width: `${liveStats.attentionPct}%`, 
+                        background: liveStats.attentionPct >= 75 ? fg : "#fbbf24", 
+                        borderRadius: 3, transition: "all 0.5s cubic-bezier(0.16,1,0.3,1)" 
+                      }} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Activity Stream */}
+            <div className="premium-card fade-up" style={{ 
+              background: cardBg, border: `1px solid ${border}`, 
+              borderRadius: 24, padding: 32, flex: 1
+            }}>
+              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, marginBottom: 24 }}>ACTIVITY STREAM</h3>
+              {logs.length === 0 ? (
+                <div style={{ padding: "20px 0", color: fgMuted }}>
+                  <p style={{ fontSize: 14 }}>Waiting for tracking activity...</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {logs.map((log, i) => (
+                    <div key={i} style={{ 
+                      display: "flex", gap: 16, alignItems: "start", paddingBottom: 14,
+                      borderBottom: i === logs.length - 1 ? "none" : `1px solid ${border}`,
+                      fontSize: 13, color: log.type === 'error' ? "#f87171" : log.type === 'warn' ? "#fbbf24" : fg
+                    }}>
+                      <span style={{ fontFamily: "monospace", opacity: 0.4, fontSize: 11, paddingTop: 2 }}>{log.time}</span>
+                      <span style={{ fontWeight: 500, lineHeight: 1.4 }}>{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── SESSION REPORT ── */}
+        {report && (
+          <div className="fade-up" style={{ marginTop: 80 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 40 }}>
+              <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, margin: 0 }}>SESSION <span style={{ color: fgMuted }}>INTELLIGENCE</span></h2>
+              <div style={{ height: 1, flex: 1, background: border }} />
+            </div>
+
+            <div style={{ 
+              display: 'flex', alignItems: 'center', gap: '1.5rem', 
+              backgroundColor: cardBg, borderRadius: '16px', padding: '24px 32px', 
+              marginBottom: '32px', border: `1px solid ${cardBorder}` 
+            }}>
+              <GradeIcon grade={report.grade} size={40} />
+              <div>
+                <div style={{ color: fg, fontWeight: 800, fontSize: '1.8rem', letterSpacing: '-0.5px', fontFamily: "'Bebas Neue', sans-serif" }}>{report.grade.toUpperCase()}</div>
+                <div style={{ color: fgMuted, fontSize: '14px', fontWeight: 500 }}>Overall attention rating for this session</div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginBottom: 32 }}>
+              <ReportMetricCard label="Start Time"     value={report.startTime} />
+              <ReportMetricCard label="End Time"       value={report.endTime} />
+              <ReportMetricCard label="Total Duration" value={report.totalDuration} />
+              <ReportMetricCard label="Focused Time"   value={report.focusedTime} />
+              <ReportMetricCard label="Away Time"      value={report.awayTime} />
+              <ReportMetricCard label="Attention"      value={`${report.attentionPercent}%`} highlight />
+              <ReportMetricCard label="No-Face Alerts" value={report.noFaceAlerts} />
+              <ReportMetricCard label="Distractions"   value={report.tabSwitches} />
+            </div>
+
+            {/* ATTENTION BAR */}
+            <div style={{ marginBottom: '40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: fgMuted, fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Attention Score</span>
+                <span style={{ color: fg, fontWeight: 800, fontSize: '14px' }}>{report.attentionPercent}%</span>
+              </div>
+              <div style={{ height: 6, background: border, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: "100%", width: `${report.attentionPercent}%`, background: fg, borderRadius: 3 }} />
+              </div>
+            </div>
+
+            {/* DISTRACTION LOG (TIMELINE) */}
+            {report.awayEvents.length > 0 && (
+              <div className="premium-card" style={{ 
+                background: cardBg, border: `1px solid ${border}`, 
+                borderRadius: 24, padding: 32, marginBottom: 32
+              }}>
+                <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 24 }}>DISTRACTION LOG</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {report.awayEvents.map((ev, i) => (
+                    <div key={i} style={{ 
+                      display: "grid", gridTemplateColumns: "100px 1fr 150px 100px", gap: 20,
+                      padding: "16px 0", borderBottom: i === report.awayEvents.length - 1 ? "none" : `1px solid ${border}`,
+                      alignItems: "center"
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: fgMuted }}>{fmt(new Date(ev.startTime))}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{ev.label}</div>
+                      <div style={{ fontSize: 12, color: fgMuted, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ background: border, padding: "2px 8px", borderRadius: 4, fontSize: 10 }}>{ev.kind.toUpperCase()}</span>
+                        {ev.endTime ? `to ${fmt(new Date(ev.endTime))}` : ""}
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, textAlign: "right" }}>{elapsed(ev.durationMs)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
+
+            {/* INSIGHTS */}
+            <div className="premium-card" style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: 24, padding: 32 }}>
+              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 20 }}>INSIGHTS</h3>
+              <div style={{ color: fgMuted, fontSize: 14, lineHeight: 1.8 }}>
+                {report.attentionPercent >= 85 && <div className="insight-item" style={{ color: fg }}>Great focus — you maintained strong attention throughout the session.</div>}
+                {report.attentionPercent < 85 && report.attentionPercent >= 65 && <div className="insight-item">Good session. A few attention dips — try minimizing distractions.</div>}
+                {report.attentionPercent < 65 && <div className="insight-item">Attention was low. Consider shorter sessions with breaks.</div>}
+                {report.tabSwitches === 0 && <div className="insight-item" style={{ color: fg }}>Zero distractions — excellent focus environment!</div>}
+                {report.tabSwitches > 0 && report.tabSwitches <= 3 && <div className="insight-item">Minimal distractions ({report.tabSwitches}) — good discipline.</div>}
+                {report.tabSwitches > 3 && <div className="insight-item">You left the session {report.tabSwitches} times — try closing other apps before starting.</div>}
+                {report.awayEvents.some(e => e.durationMs > 60000) && <div className="insight-item">At least one distraction lasted over a minute — consider using Do Not Disturb mode.</div>}
+                {report.noFaceAlerts > 3 && <div className="insight-item">Multiple no-face alerts — make sure you're seated in front of the camera.</div>}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>
+              <button 
+                className="glow-btn"
+                onClick={() => window.location.href = '/tracker'}
+                style={{ 
+                  background: fg, color: bg, border: "none", borderRadius: 12, 
+                  padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8
+                }}
+              >
+                Focus History <History size={16} />
+              </button>
+              <button 
+                className="glow-btn"
+                onClick={() => setReport(null)}
+                style={{ 
+                  background: "transparent", color: fg, border: `1px solid ${border}`, 
+                  borderRadius: 12, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer"
+                }}
+              >
+                Close Report
+              </button>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ padding: "60px 24px", borderTop: `1px solid ${border}`, background: "rgba(0,0,0,0.02)" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 32 }}>
+          <div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 1, marginBottom: 8 }}>ZENITH</div>
+            <p style={{ color: fgMuted, fontSize: 13, margin: 0 }}>© 2026 Zenith AI Focus System. Private by design.</p>
+          </div>
+          <div style={{ display: "flex", gap: 40, fontSize: 13, fontWeight: 600, color: fgMuted }}>
+            <span style={{ cursor: "pointer" }}>Privacy</span>
+            <span style={{ cursor: "pointer" }}>Infrastructure</span>
+            <span style={{ cursor: "pointer" }}>Open Source</span>
           </div>
         </div>
-      </div>
-
-      {report && <SessionReport report={report} />}
+      </footer>
     </div>
   );
 }
-function StatItem({ label, value, highlight }) {
-  const color = highlight === 'green' ? '#fff' : highlight === 'yellow' ? '#ccc' : highlight === 'red' ? '#888' : '#fff';
+
+function LiveStatCard({ label, value, icon, color }) {
   return (
-    <div style={S.statItem}>
-      <span style={S.statLabel}>{label}</span>
-      <span style={{ ...S.statValue, color }}>{value}</span>
+    <div style={{ 
+      padding: '12px 16px', background: "rgba(255,255,255,0.02)", 
+      borderRadius: '12px', border: `1px solid rgba(255,255,255,0.05)`,
+      display: 'flex', flexDirection: 'column', gap: '4px'
+    }}>
+      <div style={{ fontSize: '10px', fontWeight: 800, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: color || "inherit" }}>{value}</div>
     </div>
   );
 }
 
-function AttentionBar({ pct: p }) {
+function ReportMetricCard({ label, value, highlight = false }) {
   return (
-    <div style={{ marginTop: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-        <span style={{ color: '#444', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Attention Score</span>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.88rem' }}>{p}%</span>
-      </div>
-      <div style={S.barBg}>
-        <div style={{ ...S.barFill, width: `${p}%` }} />
-      </div>
+    <div style={{ 
+      background: "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,0.08)`, 
+      borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px'
+    }}>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: highlight ? "#fff" : "rgba(255,255,255,0.85)" }}>{value}</div>
     </div>
   );
 }
 
-function SessionReport({ report }) {
-  const gc = report.grade === 'Excellent' ? '#fff' : report.grade === 'Good' ? '#ccc' : report.grade === 'Fair' ? '#999' : '#666';
-
-  return (
-    <div style={S.reportContainer}>
-      <h2 style={S.reportTitle}>Session Report</h2>
-      <p style={{ color: '#444', margin: '0 0 1.5rem 0', fontSize: '0.85rem' }}>{report.date}</p>
-      <div style={{ ...S.gradeBanner, borderColor: '#2a2a2a' }}>
-        <GradeIconReport grade={report.grade} />
-        <div>
-          <div style={{ color: gc, fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.3px' }}>{report.grade}</div>
-          <div style={{ color: '#555', fontSize: '0.85rem' }}>Overall attention rating</div>
-        </div>
-      </div>
-      <div style={S.reportGrid}>
-        <ReportCard label="Start Time"     value={report.startTime} />
-        <ReportCard label="End Time"       value={report.endTime} />
-        <ReportCard label="Total Duration" value={report.totalDuration} />
-        <ReportCard label="Focused Time"   value={report.focusedTime} />
-        <ReportCard label="Away Time"      value={report.awayTime} />
-        <ReportCard label="Attention"      value={`${report.attentionPercent}%`} bright />
-        <ReportCard label="No-Face Alerts" value={report.noFaceAlerts} />
-        <ReportCard label="Distractions"   value={report.tabSwitches} />
-      </div>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <AttentionBar pct={report.attentionPercent} />
-      </div>
-      {report.awayEvents.length > 0 && (
-        <div style={S.timelineSection}>
-          <h3 style={S.cardTitle}>Distraction Log</h3>
-          <div style={S.tableWrapper}>
-            <table style={S.table}>
-              <thead>
-                <tr>
-                  <th style={S.th}>#</th>
-                  <th style={S.th}>Type</th>
-                  <th style={S.th}>Details</th>
-                  <th style={S.th}>Left At</th>
-                  <th style={S.th}>Returned At</th>
-                  <th style={S.th}>Duration Away</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.awayEvents.map((ev, i) => (
-                  <tr key={ev.id} style={{ backgroundColor: i % 2 === 0 ? '#111' : '#0a0a0a' }}>
-                    <td style={S.td}>{i + 1}</td>
-                    <td style={S.td}>
-                      <span style={S.typePill}>
-                        {ev.kind === 'tab' ? 'Tab' : 'App'}
-                      </span>
-                    </td>
-                    <td style={{ ...S.td, color: '#555', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.label}
-                    </td>
-                    <td style={S.td}>{fmt(ev.startTime)}</td>
-                    <td style={S.td}>{ev.endTime ? fmt(ev.endTime) : '—'}</td>
-                    <td style={{ ...S.td, color: ev.durationMs > 30000 ? '#888' : '#fff', fontWeight: 700 }}>
-                      {ev.durationMs ? elapsed(ev.durationMs) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      <div style={S.insightsSection}>
-        <h3 style={S.cardTitle}>Insights</h3>
-        <ul style={{ margin: 0, padding: '0 0 0 1.2rem', color: '#666', lineHeight: '1.9', fontSize: '0.9rem' }}>
-          {report.attentionPercent >= 85 && <li style={{ color: '#fff' }}>Great focus — you maintained strong attention throughout the session.</li>}
-          {report.attentionPercent < 85 && report.attentionPercent >= 65 && <li>Good session. A few attention dips — try minimizing distractions.</li>}
-          {report.attentionPercent < 65 && <li>Attention was low. Consider shorter sessions with breaks.</li>}
-          {report.tabSwitches === 0 && <li style={{ color: '#fff' }}>Zero distractions — excellent focus environment!</li>}
-          {report.tabSwitches > 0 && report.tabSwitches <= 3 && <li>Minimal distractions ({report.tabSwitches}) — good discipline.</li>}
-          {report.tabSwitches > 3 && <li>You left the session {report.tabSwitches} times — try closing other apps before starting.</li>}
-          {report.awayEvents.some(e => e.durationMs > 60000) && <li>At least one distraction lasted over a minute — consider using Do Not Disturb mode.</li>}
-          {report.noFaceAlerts > 3 && <li>Multiple no-face alerts — make sure you're seated in front of the camera.</li>}
-        </ul>
-      </div>
-    </div>
-  );
+function GradeIcon({ grade, size = 24 }) {
+  const { dark } = useTheme();
+  const color = dark ? "#fff" : "#000";
+  if (grade === 'Excellent') return <Trophy size={size} color={color} />;
+  if (grade === 'Good')      return <ThumbsUp size={size} color={color} />;
+  if (grade === 'Fair')      return <TrendingUp size={size} color={color} />;
+  return <AlertTriangle size={size} color={color} />;
 }
 
-function GradeIconReport({ grade }) {
-  const c = grade === 'Excellent' ? '#fff' : grade === 'Good' ? '#ccc' : grade === 'Fair' ? '#999' : '#666';
-  if (grade === 'Excellent') return <Trophy        size={28} color={c} />;
-  if (grade === 'Good')      return <ThumbsUp      size={28} color={c} />;
-  if (grade === 'Fair')      return <TrendingUp    size={28} color={c} />;
-  return                            <AlertTriangle size={28} color={c} />;
-}
-
-function ReportCard({ label, value, bright = false }) {
-  return (
-    <div style={S.reportCard}>
-      <div>
-        <div style={{ color: '#444', fontSize: '0.7rem', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</div>
-        <div style={{ color: bright ? '#fff' : '#aaa', fontWeight: 700, fontSize: '1rem' }}>{value}</div>
-      </div>
-    </div>
-  );
-}
-const S = {
-  container: {
-    padding: '2rem', maxWidth: '1200px', margin: '0 auto',
-    fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
-    minHeight: '100vh', color: '#fff', backgroundColor: '#000',
-  },
-  header: { marginBottom: '2rem', borderBottom: '1px solid #222', paddingBottom: '1.5rem' },
-  title: {
-    fontSize: '2.2rem', margin: '0 0 0.4rem 0', fontWeight: 800,
-    color: '#fff', letterSpacing: '-0.5px',
-  },
-  desc: { color: '#666', margin: 0, fontSize: '1rem', lineHeight: '1.6' },
-  controls: { marginBottom: '2rem', display: 'flex', justifyContent: 'center' },
-  startBtn: {
-    backgroundColor: '#fff', color: '#000', border: 'none',
-    padding: '13px 36px', fontSize: '1rem', borderRadius: '50px',
-    cursor: 'pointer', fontWeight: '700', letterSpacing: '0.3px',
-  },
-  stopBtn: {
-    backgroundColor: 'transparent', color: '#fff', border: '1px solid #555',
-    padding: '13px 36px', fontSize: '1rem', borderRadius: '50px',
-    cursor: 'pointer', fontWeight: '700', letterSpacing: '0.3px',
-  },
-  content: { display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' },
-  videoSection: { flex: '1 1 auto', maxWidth: '640px', display: 'flex', justifyContent: 'center' },
-  detectorWrapper: {
-    borderRadius: '12px', overflow: 'hidden',
-    border: '1px solid #222', backgroundColor: '#000',
-  },
-  placeholder: {
-    width: '100%', maxWidth: '640px', aspectRatio: '4/3', backgroundColor: '#0a0a0a',
-    borderRadius: '12px', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    color: '#333', border: '1px dashed #222', fontSize: '1rem',
-  },
-  placeholderIcon: { fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.3 },
-  infoSection: { flex: '1 1 340px', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '1rem' },
-  card: {
-    backgroundColor: '#0f0f0f', padding: '1.25rem',
-    borderRadius: '12px', border: '1px solid #222',
-  },
-  cardTitle: { margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#555', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.8px' },
-  badge: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    padding: '8px 20px', borderRadius: '30px', fontWeight: '700',
-    fontSize: '0.88rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.8px',
-    border: '1px solid #333',
-  },
-  awayBanner: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#111', border: '1px solid #444', borderRadius: '8px',
-    padding: '0.6rem 1rem', marginBottom: '1rem', color: '#fff', fontSize: '0.88rem',
-  },
-  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' },
-  statItem: {
-    backgroundColor: '#111', borderRadius: '8px', padding: '0.75rem 1rem',
-    display: 'flex', flexDirection: 'column', gap: '3px', border: '1px solid #1e1e1e',
-  },
-  statLabel: { color: '#444', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.6px' },
-  statValue: { color: '#fff', fontWeight: '700', fontSize: '1rem' },
-  barBg: { height: '4px', backgroundColor: '#1e1e1e', borderRadius: '99px', overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: '99px', backgroundColor: '#fff', transition: 'width 0.5s ease' },
-  logList: { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' },
-  logItem: {
-    fontSize: '0.82rem', padding: '7px 10px', backgroundColor: '#111',
-    borderRadius: '7px', display: 'flex', gap: '0.6rem', alignItems: 'center',
-    borderLeft: '2px solid #222',
-  },
-  logTime: { color: '#444', fontFamily: '"Fira Code", monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' },
-
-  reportContainer: {
-    marginTop: '3rem', backgroundColor: '#0f0f0f', borderRadius: '16px',
-    border: '1px solid #222', padding: '2rem',
-  },
-  reportTitle: {
-    margin: '0 0 0.25rem 0', fontSize: '1.6rem', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px',
-  },
-  gradeBanner: {
-    display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#111',
-    borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '1.5rem', border: '1px solid #2a2a2a',
-  },
-  reportGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-    gap: '0.75rem', marginBottom: '1.5rem',
-  },
-  reportCard: {
-    backgroundColor: '#111', borderRadius: '10px', padding: '1rem',
-    display: 'flex', alignItems: 'center', gap: '0.75rem', border: '1px solid #1e1e1e',
-  },
-  timelineSection: { marginBottom: '1.5rem' },
-  tableWrapper: { overflowX: 'auto', borderRadius: '10px', border: '1px solid #222' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' },
-  th: {
-    padding: '10px 14px', textAlign: 'left', color: '#444',
-    backgroundColor: '#0a0a0a', fontWeight: '600', fontSize: '0.72rem',
-    textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap',
-  },
-  td: { padding: '10px 14px', color: '#fff', verticalAlign: 'middle' },
-  typePill: {
-    display: 'inline-block', padding: '3px 10px', borderRadius: '99px',
-    fontSize: '0.75rem', fontWeight: '600', color: '#fff',
-    backgroundColor: '#222', border: '1px solid #333', whiteSpace: 'nowrap',
-  },
-  insightsSection: { backgroundColor: '#111', borderRadius: '10px', padding: '1.25rem', border: '1px solid #1e1e1e' },
-};

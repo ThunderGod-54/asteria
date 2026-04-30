@@ -4,41 +4,10 @@ import {
   Eye, Bell, Shuffle, Clock, Timer, Target,
   Download, Trash2, ChevronDown, ChevronUp,
   FileText, FileJson, Inbox, Globe, Monitor,
-  CalendarDays, Zap, ArrowRight,
+  CalendarDays, Zap, ArrowRight, Activity, Calendar, History
 } from 'lucide-react';
 import { getSessions, deleteSession, clearAllSessions } from '../services/sessionStore';
-
-// ─── palette ──────────────────────────────────────────────────────────────────
-const C = {
-  bg:        '#000',
-  surface:   '#0f0f0f',
-  raised:    '#1a1a1a',
-  border:    '#2a2a2a',
-  borderHi:  '#fff',
-  text:      '#fff',
-  muted:     '#888',
-  faint:     '#444',
-  // semantic — kept minimal, only for meaning
-  good:      '#fff',
-  warn:      '#aaa',
-  danger:    '#fff',
-};
-
-// grade uses white shades so it stays monochrome but still distinct
-const gradeStyle = (g) => ({
-  Excellent:         { color: '#fff',  border: '#fff' },
-  Good:              { color: '#ccc',  border: '#ccc' },
-  Fair:              { color: '#999',  border: '#999' },
-  'Needs Improvement': { color: '#666', border: '#666' },
-}[g] || { color: '#fff', border: '#fff' });
-
-const GradeIcon = ({ grade, size = 18 }) => {
-  const c = gradeStyle(grade).color;
-  if (grade === 'Excellent') return <Trophy        size={size} color={c} />;
-  if (grade === 'Good')      return <ThumbsUp      size={size} color={c} />;
-  if (grade === 'Fair')      return <TrendingUp    size={size} color={c} />;
-  return                            <AlertTriangle size={size} color={c} />;
-};
+import { useTheme } from "../Theme";
 
 const elapsed = (ms) => {
   if (!ms || ms <= 0) return '0s';
@@ -59,6 +28,15 @@ const sessionSummary = (s) => {
   const d = s.tabSwitches === 0 ? 'with zero distractions' : s.tabSwitches === 1 ? 'with 1 distraction' : `with ${s.tabSwitches} distractions`;
   return `You were ${focus} during this ${s.totalDuration} session, ${d}.`;
 };
+
+const Noise = () => (
+  <svg style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.04 }}>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)" />
+  </svg>
+);
 
 // ─── downloads ────────────────────────────────────────────────────────────────
 function buildTextReport(s) {
@@ -100,220 +78,285 @@ const downloadAllCSV  = (sessions) => {
   dl(new Blob([[h.join(','), ...rows].join('\n')], { type: 'text/csv' }), 'zenith-all-sessions.csv');
 };
 
-// ─── main ─────────────────────────────────────────────────────────────────────
 export default function AppTracker() {
-  const [sessions, setSessions]         = useState([]);
-  const [selected, setSelected]         = useState(null);
+  const { dark } = useTheme();
+  const [sessions, setSessions] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [filter, setFilter]             = useState('all');
+  const [filter, setFilter] = useState('all');
+
+  const bg = dark ? "#080808" : "#F5F5F0";
+  const fg = dark ? "#FFFFFF" : "#0A0A0A";
+  const fgMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
+  const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
+  const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
   const reload = useCallback(() => setSessions(getSessions()), []);
   useEffect(() => { reload(); }, [reload]);
 
-  const handleDelete   = (id) => { deleteSession(id); if (selected === id) setSelected(null); reload(); };
+  const handleDelete = (id) => { deleteSession(id); if (selected === id) setSelected(null); reload(); };
   const handleClearAll = () => { clearAllSessions(); setSelected(null); setConfirmClear(false); reload(); };
 
   const filtered = filter === 'all' ? sessions : sessions.filter(s => s.grade === filter);
-  const total    = sessions.length;
-  const avgAttn  = total === 0 ? 0 : Math.round(sessions.reduce((a, s) => a + (s.attentionPercent || 0), 0) / total);
-  const best     = total === 0 ? null : sessions.reduce((a, s) => s.attentionPercent > a.attentionPercent ? s : a, sessions[0]);
+  const total = sessions.length;
+  const avgAttn = total === 0 ? 0 : Math.round(sessions.reduce((a, s) => a + (s.attentionPercent || 0), 0) / total);
+  const best = total === 0 ? null : sessions.reduce((a, s) => s.attentionPercent > a.attentionPercent ? s : a, sessions[0]);
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
+      }
+      .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+      .premium-card {
+        transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+        position: relative;
+        overflow: hidden;
+      }
+      .premium-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 60%);
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      .premium-card:hover::before { opacity: 1; }
+
+      .glow-btn {
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+      .glow-btn::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .glow-btn:hover::after { opacity: 1; }
+    `;
+    document.head.appendChild(style);
+
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
+
+    return () => {
+      document.head.removeChild(style);
+      obs.disconnect();
+    };
+  }, []);
 
   return (
-    <div style={S.page}>
+    <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
+      <Noise />
 
-      {/* header */}
-      <div style={S.pageHeader}>
-        <div>
-          <h1 style={S.title}>Your Focus History</h1>
-          <p style={S.sub}>A look back at how well you've been staying on task.</p>
-        </div>
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "60px 24px 100px", position: "relative", zIndex: 1 }}>
+        
+        {/* ── HEADER ── */}
+        <header className="fade-up" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 60, flexWrap: "wrap", gap: 24 }}>
+          <div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
+              <History size={12} />
+              FOCUS ANALYTICS
+            </div>
+            <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(40px, 6vw, 64px)", letterSpacing: -0.5, lineHeight: 1.1, margin: 0 }}>
+              YOUR FOCUS <span style={{ WebkitTextStroke: `1px ${fg}`, color: "transparent" }}>HISTORY</span>
+            </h1>
+            <p style={{ color: fgMuted, fontSize: 16, maxWidth: 450, marginTop: 12, lineHeight: 1.5 }}>
+              Review your cognitive performance over time and identify patterns in your daily workflow.
+            </p>
+          </div>
+
+          {total > 0 && (
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="glow-btn" onClick={() => downloadAllCSV(sessions)} style={{ background: fg, color: bg, border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                <Download size={16} /> Export CSV
+              </button>
+              {confirmClear ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button onClick={handleClearAll} style={{ background: "#f87171", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+                  <button onClick={() => setConfirmClear(false)} style={{ background: "transparent", color: fg, border: `1px solid ${border}`, borderRadius: 12, padding: "12px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmClear(true)} style={{ background: "transparent", color: fgMuted, border: `1px solid ${border}`, borderRadius: 12, padding: "12px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          )}
+        </header>
+
+        {/* ── OVERVIEW ── */}
         {total > 0 && (
-          <div style={S.headerActions}>
-            <Btn icon={<Download size={14} />} label="Export CSV" onClick={() => downloadAllCSV(sessions)} />
-            {confirmClear ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ color: C.muted, fontSize: '0.88rem' }}>Remove all sessions?</span>
-                <Btn label="Yes, remove" onClick={handleClearAll} danger />
-                <Btn label="Cancel" onClick={() => setConfirmClear(false)} />
-              </div>
-            ) : (
-              <Btn icon={<Trash2 size={14} />} label="Clear history" onClick={() => setConfirmClear(true)} danger />
-            )}
+          <div className="fade-up premium-card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 24, padding: "32px 0", marginBottom: 60 }}>
+            <OverviewStat num={total} label="TOTAL SESSIONS" />
+            <OverviewStat num={`${avgAttn}%`} label="AVERAGE ATTENTION" />
+            <OverviewStat num={best?.grade ?? '—'} label="PEAK PERFORMANCE" highlight />
           </div>
         )}
-      </div>
 
-      {/* overview strip */}
-      {total > 0 && (
-        <div style={S.overviewStrip}>
-          <OverviewStat num={total}           label="sessions recorded" />
-          <div style={S.overviewDivider} />
-          <OverviewStat num={`${avgAttn}%`}   label="average attention" dim={avgAttn < 50} />
-          <div style={S.overviewDivider} />
-          <OverviewStat num={best?.grade ?? '—'} label="best grade achieved" />
-        </div>
-      )}
+        {/* ── FILTERS ── */}
+        {total > 0 && (
+          <div className="fade-up" style={{ display: "flex", gap: 8, marginBottom: 32, overflowX: "auto", paddingBottom: 12 }}>
+            {['all', 'Excellent', 'Good', 'Fair', 'Needs Improvement'].map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  background: filter === f ? fg : cardBg,
+                  color: filter === f ? bg : fg,
+                  border: `1px solid ${filter === f ? "transparent" : border}`,
+                  borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 700,
+                  cursor: "pointer", transition: "all 0.3s ease", whiteSpace: "nowrap"
+                }}
+              >
+                {f === 'all' ? 'All Activity' : f}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* filter tabs */}
-      {total > 0 && (
-        <div style={S.filterRow}>
-          <span style={S.filterLabel}>Show:</span>
-          {['all', 'Excellent', 'Good', 'Fair', 'Needs Improvement'].map(f => (
-            <button
-              key={f}
-              style={{ ...S.filterTab, ...(filter === f ? S.filterTabActive : {}) }}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? 'All sessions' : f}
-            </button>
+        {/* ── EMPTY STATE ── */}
+        {total === 0 && (
+          <div className="fade-up" style={{ textAlign: "center", padding: "100px 0" }}>
+            <div style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: "50%", width: 80, height: 80, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+              <Inbox size={32} color={fgMuted} />
+            </div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Archived intelligence is empty</h3>
+            <p style={{ color: fgMuted, maxWidth: 300, margin: "0 auto" }}>Head to Face Detection to start tracking your cognitive flow.</p>
+          </div>
+        )}
+
+        {/* ── LIST ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {filtered.map((s, idx) => (
+            <SessionCard
+              key={s.id} session={s} index={total - idx}
+              expanded={selected === s.id}
+              onToggle={() => setSelected(selected === s.id ? null : s.id)}
+              onDelete={() => handleDelete(s.id)}
+              onDownloadTxt={() => downloadText(s)}
+              onDownloadJSON={() => downloadJSON(s)}
+              fg={fg} fgMuted={fgMuted} border={border} cardBg={cardBg} cardBorder={cardBorder}
+            />
           ))}
+          {filtered.length === 0 && total > 0 && (
+            <div style={{ textAlign: "center", padding: "60px 0", color: fgMuted }}>
+              No sessions match this performance tier.
+            </div>
+          )}
         </div>
-      )}
-
-      {/* empty */}
-      {total === 0 && (
-        <div style={S.emptyState}>
-          <div style={S.emptyIcon}><Inbox size={32} color={C.faint} /></div>
-          <p style={S.emptyTitle}>Nothing here yet</p>
-          <p style={S.emptySub}>Head over to Face Detection, run a session, and your report will appear here.</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: C.muted, fontSize: '0.88rem', marginTop: '0.75rem' }}>
-            <span>Go to Face Detection</span><ArrowRight size={13} />
-          </div>
-        </div>
-      )}
-
-      {/* list */}
-      <div style={S.list}>
-        {filtered.map((s, idx) => (
-          <SessionCard
-            key={s.id} session={s} index={total - idx}
-            expanded={selected === s.id}
-            onToggle={() => setSelected(selected === s.id ? null : s.id)}
-            onDelete={() => handleDelete(s.id)}
-            onDownloadTxt={() => downloadText(s)}
-            onDownloadJSON={() => downloadJSON(s)}
-          />
-        ))}
-        {filtered.length === 0 && total > 0 && (
-          <p style={{ color: C.faint, textAlign: 'center', padding: '3rem 0' }}>No sessions with that grade yet.</p>
-        )}
-      </div>
+      </main>
     </div>
   );
 }
 
-// ─── session card ─────────────────────────────────────────────────────────────
-function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownloadTxt, onDownloadJSON }) {
-  const gs = gradeStyle(s.grade);
-
+function OverviewStat({ num, label, highlight }) {
   return (
-    <div style={{ ...S.card, ...(expanded ? { borderColor: '#fff' } : {}) }}>
+    <div style={{ textAlign: "center", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "0 24px" }}>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, color: highlight ? "#fff" : "inherit", lineHeight: 1, marginBottom: 8 }}>{num}</div>
+      <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.35)", letterSpacing: 1.5 }}>{label}</div>
+    </div>
+  );
+}
 
-      {/* summary row */}
-      <div style={S.cardRow} onClick={onToggle} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && onToggle()}>
-
-        {/* grade badge */}
-        <div style={{ ...S.gradeBadge, borderColor: gs.border + '55' }}>
-          <GradeIcon grade={s.grade} size={20} />
-          <span style={{ color: gs.color, fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.3px' }}>{s.grade}</span>
-        </div>
-
-        {/* info */}
-        <div style={S.cardInfo}>
-          <div style={S.cardMeta}>
-            <CalendarDays size={13} color={C.faint} />
-            <span>{fmtDate(s.startTimeISO)}</span>
-            <span style={{ marginLeft: 'auto', color: C.faint, fontSize: '0.75rem' }}>#{index}</span>
+function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownloadTxt, onDownloadJSON, fg, fgMuted, border, cardBg, cardBorder }) {
+  return (
+    <div className="fade-up premium-card" style={{ 
+      background: cardBg, border: `1px solid ${expanded ? fg : cardBorder}`, 
+      borderRadius: 20, overflow: "hidden"
+    }}>
+      <div style={{ padding: 24, cursor: "pointer" }} onClick={onToggle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+          
+          {/* Grade Badge */}
+          <div style={{ background: fg, color: "black", padding: "12px 16px", borderRadius: 12, minWidth: 80, textAlign: "center" }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, lineHeight: 1 }}>{s.grade === 'Needs Improvement' ? 'NI' : s.grade.toUpperCase()}</div>
           </div>
-          <p style={S.cardSummary}>{sessionSummary(s)}</p>
-        </div>
 
-        {/* quick stats */}
-        <div style={S.quickStats}>
-          <QStat icon={<Clock   size={12} color={C.faint} />} value={s.totalDuration} />
-          <QStat icon={<Eye     size={12} color={C.muted} />} value={`${s.attentionPercent}%`} bright />
-          <QStat icon={<Shuffle size={12} color={C.faint} />} value={`${s.tabSwitches} away`} />
-        </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, color: fgMuted, marginBottom: 4 }}>
+              <Calendar size={12} /> {fmtDate(s.startTimeISO)}
+              <span style={{ opacity: 0.3 }}>•</span>
+              <span>SESSION #{index}</span>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: fg }}>{sessionSummary(s)}</div>
+          </div>
 
-        <div style={{ color: C.faint, flexShrink: 0 }}>
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          <div style={{ display: "flex", gap: 24 }}>
+            <QuickStat icon={<Clock size={14} />} value={s.totalDuration} fgMuted={fgMuted} />
+            <QuickStat icon={<Eye size={14} />} value={`${s.attentionPercent}%`} fgMuted={fgMuted} highlight />
+            <QuickStat icon={<Shuffle size={14} />} value={s.tabSwitches} fgMuted={fgMuted} />
+            <div style={{ color: fgMuted }}>
+              {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* expanded */}
       {expanded && (
-        <div style={S.cardDetail}>
-          <div style={S.divider} />
-
-          {/* time row */}
-          <div style={S.timeRow}>
-            <TBlock label="Started"  value={s.startTime} />
-            <ArrowRight size={13} color={C.faint} />
-            <TBlock label="Ended"    value={s.endTime} />
-            <div style={{ width: '1px', height: '28px', backgroundColor: C.border, margin: '0 0.5rem' }} />
-            <TBlock label="Duration" value={s.totalDuration} />
+        <div style={{ padding: "0 24px 24px" }}>
+          <div style={{ height: 1, background: border, marginBottom: 24 }} />
+          
+          {/* Expanded Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 32 }}>
+            <PillStat icon={<Target size={14} />} label="FOCUSED" value={s.focusedTime} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Zap size={14} />} label="AWAY" value={s.awayTime} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Bell size={14} />} label="ALERTS" value={s.noFaceAlerts} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Shuffle size={14} />} label="IDENTIFIED" value={`${s.tabSwitches} events`} fg={fg} fgMuted={fgMuted} border={border} />
           </div>
 
-          {/* stat pills */}
-          <div style={S.pillRow}>
-            <SPill icon={<Target  size={13} />} label="Focused"      value={s.focusedTime} />
-            <SPill icon={<Zap     size={13} />} label="Away"         value={s.awayTime} />
-            <SPill icon={<Eye     size={13} />} label="Attention"    value={`${s.attentionPercent}%`} bright />
-            <SPill icon={<Bell    size={13} />} label="Alerts"       value={s.noFaceAlerts} />
-            <SPill icon={<Shuffle size={13} />} label="Distractions" value={s.tabSwitches} />
-          </div>
-
-          {/* attention bar */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ color: C.muted, fontSize: '0.8rem', letterSpacing: '0.3px', textTransform: 'uppercase' }}>Attention score</span>
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.88rem' }}>{s.attentionPercent}%</span>
+          {/* Attention Bar */}
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 12 }}>
+              <span style={{ color: fgMuted, fontWeight: 700 }}>ATTENTION ANALYSIS</span>
+              <span style={{ fontWeight: 800 }}>{s.attentionPercent}%</span>
             </div>
-            <div style={S.barTrack}>
-              <div style={{ ...S.barFill, width: `${s.attentionPercent}%` }} />
+            <div style={{ height: 6, background: border, borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${s.attentionPercent}%`, background: fg, borderRadius: 3 }} />
             </div>
           </div>
 
-          {/* distraction log */}
+          {/* Activity Log */}
           {(s.awayEvents || []).length > 0 && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={S.sectionLabel}>
-                <Shuffle size={13} color={C.muted} />
-                {s.awayEvents.length === 1 ? 'You left once during this session' : `You left ${s.awayEvents.length} times during this session`}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ marginBottom: 32 }}>
+              <h4 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1, marginBottom: 16 }}>DISTRACTION TIMELINE</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {s.awayEvents.map((ev, i) => (
-                  <div key={i} style={S.distractRow}>
-                    <div style={{ ...S.kindTag, borderColor: C.border }}>
-                      {ev.kind === 'tab' ? <Globe size={11} color={C.muted} /> : <Monitor size={11} color={C.muted} />}
-                      <span style={{ color: C.muted, fontSize: '0.75rem', fontWeight: 600 }}>
-                        {ev.kind === 'tab' ? 'Tab' : 'App'}
-                      </span>
-                    </div>
-                    <span style={{ color: C.muted, fontSize: '0.82rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.label}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: C.faint, fontSize: '0.78rem', flexShrink: 0 }}>
-                      <span>{ev.startTime ? new Date(ev.startTime).toLocaleTimeString() : '?'}</span>
-                      <ArrowRight size={10} color={C.faint} />
-                      <span>{ev.endTime ? new Date(ev.endTime).toLocaleTimeString() : '—'}</span>
-                    </div>
-                    <span style={{ color: ev.durationMs > 30000 ? '#aaa' : '#fff', fontWeight: 700, fontSize: '0.82rem', flexShrink: 0, minWidth: '40px', textAlign: 'right' }}>
-                      {ev.durationMs ? elapsed(ev.durationMs) : '—'}
-                    </span>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0", borderTop: `1px solid ${border}`, fontSize: 13 }}>
+                    <div style={{ color: fgMuted, fontSize: 11, fontWeight: 700, width: 80 }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style={{ flex: 1, fontWeight: 500 }}>{ev.label}</div>
+                    <div style={{ color: fgMuted, fontSize: 11 }}>{elapsed(ev.durationMs)}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* actions */}
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <Btn icon={<FileText size={13} />} label="Download .txt"  onClick={onDownloadTxt} />
-            <Btn icon={<FileJson size={13} />} label="Download .json" onClick={onDownloadJSON} />
-            <div style={{ marginLeft: 'auto' }}>
-              <Btn icon={<Trash2 size={13} />} label="Delete" onClick={onDelete} danger />
-            </div>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button onClick={onDownloadTxt} style={{ background: border, color: fg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <FileText size={14} /> TXT
+            </button>
+            <button onClick={onDownloadJSON} style={{ background: border, color: fg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <FileJson size={14} /> JSON
+            </button>
+            <button onClick={onDelete} style={{ marginLeft: "auto", background: "transparent", color: "#f87171", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={14} /> Delete
+            </button>
           </div>
         </div>
       )}
@@ -321,165 +364,21 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
   );
 }
 
-// ─── small components ─────────────────────────────────────────────────────────
-function Btn({ icon, label, onClick, danger = false }) {
+function QuickStat({ icon, value, fgMuted, highlight }) {
   return (
-    <button
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: '6px',
-        backgroundColor: 'transparent',
-        color: danger ? '#888' : '#fff',
-        border: `1px solid ${danger ? '#444' : '#333'}`,
-        borderRadius: '7px', padding: '7px 13px',
-        cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem',
-        letterSpacing: '0.2px',
-      }}
-      onClick={onClick}
-    >
-      {icon}{label}
-    </button>
-  );
-}
-
-function OverviewStat({ num, label, dim = false }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '0 2rem' }}>
-      <span style={{ fontSize: '2rem', fontWeight: 800, color: dim ? C.muted : '#fff', lineHeight: 1 }}>{num}</span>
-      <span style={{ color: C.faint, fontSize: '0.8rem' }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: highlight ? "inherit" : fgMuted }}>
+      {icon} {value}
     </div>
   );
 }
 
-function QStat({ icon, value, bright = false }) {
+function PillStat({ icon, label, value, fg, fgMuted, border }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: bright ? '#fff' : C.muted, fontSize: '0.82rem', fontWeight: bright ? 700 : 500 }}>
-      {icon}<span>{value}</span>
-    </div>
-  );
-}
-
-function SPill({ icon, label, value, bright = false }) {
-  return (
-    <div style={{ backgroundColor: '#111', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.55rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '80px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: C.faint, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {icon}<span>{label}</span>
+    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${border}`, borderRadius: 12, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, color: fgMuted, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, marginBottom: 4 }}>
+        {icon} {label}
       </div>
-      <span style={{ color: bright ? '#fff' : C.muted, fontWeight: 700, fontSize: '0.95rem' }}>{value}</span>
+      <div style={{ fontSize: 18, fontWeight: 700, color: fg }}>{value}</div>
     </div>
   );
 }
-
-function TBlock({ label, value }) {
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ color: C.faint, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
-      <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.92rem' }}>{value}</div>
-    </div>
-  );
-}
-
-// ─── styles ───────────────────────────────────────────────────────────────────
-const S = {
-  page: {
-    padding: '2.5rem 2rem', maxWidth: '900px', margin: '0 auto',
-    fontFamily: '"Inter", system-ui, sans-serif', color: '#fff',
-    minHeight: '100vh', backgroundColor: C.bg,
-  },
-  pageHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-    flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem',
-    borderBottom: `1px solid ${C.border}`, paddingBottom: '2rem',
-  },
-  title: {
-    fontSize: '2.2rem', margin: '0 0 0.4rem 0', fontWeight: 800,
-    color: '#fff', letterSpacing: '-0.5px',
-  },
-  sub: { color: C.muted, margin: 0, fontSize: '0.95rem' },
-  headerActions: { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' },
-
-  overviewStrip: {
-    display: 'flex', alignItems: 'center',
-    border: `1px solid ${C.border}`, borderRadius: '12px',
-    padding: '1.5rem 0', marginBottom: '2rem', flexWrap: 'wrap',
-    backgroundColor: C.surface,
-  },
-  overviewDivider: { width: '1px', height: '44px', backgroundColor: C.border, flexShrink: 0 },
-
-  filterRow: {
-    display: 'flex', alignItems: 'center', gap: '0',
-    borderBottom: `1px solid ${C.border}`, marginBottom: '2rem', flexWrap: 'wrap',
-  },
-  filterLabel: { color: C.faint, fontSize: '0.8rem', marginRight: '0.75rem', paddingBottom: '0.75rem' },
-  filterTab: {
-    background: 'none', border: 'none', borderBottom: '2px solid transparent',
-    color: C.faint, fontSize: '0.88rem', fontWeight: 500,
-    padding: '0 1rem 0.75rem', cursor: 'pointer',
-  },
-  filterTabActive: {
-    color: '#fff', fontWeight: 700, borderBottomColor: '#fff',
-  },
-
-  emptyState: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '6rem 2rem', textAlign: 'center',
-  },
-  emptyIcon: {
-    width: '68px', height: '68px', borderRadius: '50%',
-    border: `1px solid ${C.border}`, backgroundColor: C.surface,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem',
-  },
-  emptyTitle: { color: '#fff', fontWeight: 700, fontSize: '1.1rem', margin: '0 0 0.5rem 0' },
-  emptySub:   { color: C.muted, fontSize: '0.9rem', maxWidth: '340px', lineHeight: 1.7, margin: 0 },
-
-  list: { display: 'flex', flexDirection: 'column', gap: '0.6rem' },
-
-  card: {
-    backgroundColor: C.surface, borderRadius: '12px',
-    border: `1px solid ${C.border}`, overflow: 'hidden',
-    transition: 'border-color 0.15s',
-  },
-  cardRow: {
-    display: 'flex', alignItems: 'center', gap: '1rem',
-    padding: '1.1rem 1.25rem', cursor: 'pointer', userSelect: 'none', flexWrap: 'wrap',
-  },
-  gradeBadge: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
-    padding: '0.65rem 0.8rem', borderRadius: '8px', flexShrink: 0, minWidth: '70px',
-    border: '1px solid',
-    backgroundColor: '#111',
-  },
-  cardInfo: { flex: 1, minWidth: '180px' },
-  cardMeta: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem',
-    color: C.faint, fontSize: '0.82rem', marginBottom: '0.35rem',
-  },
-  cardSummary: { color: '#fff', fontSize: '0.92rem', margin: 0, lineHeight: 1.55 },
-  quickStats: { display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 },
-
-  cardDetail: { padding: '0 1.25rem 1.25rem' },
-  divider: { height: '1px', backgroundColor: C.border, marginBottom: '1.25rem' },
-
-  timeRow: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem',
-    marginBottom: '1.25rem', flexWrap: 'wrap',
-  },
-  pillRow: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' },
-
-  barTrack: { height: '4px', backgroundColor: C.border, borderRadius: '99px', overflow: 'hidden' },
-  barFill:  { height: '100%', borderRadius: '99px', backgroundColor: '#fff', transition: 'width 0.4s ease' },
-
-  sectionLabel: {
-    display: 'flex', alignItems: 'center', gap: '0.5rem',
-    color: C.muted, fontSize: '0.85rem', margin: '0 0 0.75rem 0',
-  },
-  distractRow: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem',
-    backgroundColor: '#111', border: `1px solid ${C.border}`,
-    borderRadius: '7px', padding: '0.55rem 0.85rem', flexWrap: 'wrap',
-  },
-  kindTag: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '2px 8px', borderRadius: '5px', border: '1px solid', flexShrink: 0,
-    backgroundColor: '#1a1a1a',
-  },
-};
