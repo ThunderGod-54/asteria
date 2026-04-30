@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaceDetector } from 'face-detection-module';
 import { saveSession } from '../services/sessionStore';
-import { 
-  Trophy, ThumbsUp, TrendingUp, AlertTriangle, 
-  Sparkles, Play, Square, Activity, Clock, Eye, 
+import {
+  Trophy, ThumbsUp, TrendingUp, AlertTriangle,
+  Sparkles, Play, Square, Activity, Clock, Eye,
   Shuffle, Brain, ArrowRight, Shield, Zap, Info,
   History, BarChart2, Calendar, Target, MousePointer2
 } from 'lucide-react';
@@ -38,6 +39,7 @@ const Noise = () => (
 
 export default function FaceDetection() {
   const { dark } = useTheme();
+  const navigate = useNavigate();
   const [isDetecting, setIsDetecting] = useState(false);
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('Idle');
@@ -49,6 +51,7 @@ export default function FaceDetection() {
   const sessionRef = useRef(null);
   const awayEvents = useRef([]);
   const openEvent = useRef(null);
+  const reportRef = useRef(null);
   const tickRef = useRef(null);
   const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
 
@@ -198,6 +201,11 @@ export default function FaceDetection() {
     setStatus('Idle');
     addLog('Session ended', 'info');
     setIsDetecting(false);
+
+    // Auto-scroll to report after a short delay to allow DOM update
+    setTimeout(() => {
+      reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const liveStats = (() => {
@@ -335,12 +343,37 @@ export default function FaceDetection() {
     };
   }, [fgMuted]);
 
+  // Separate effect to handle IntersectionObserver for dynamic content
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+        }
+      }),
+      { threshold: 0.1 }
+    );
+
+    const observeElements = () => {
+      document.querySelectorAll(".fade-up:not(.visible)").forEach(el => obs.observe(el));
+    };
+
+    observeElements();
+
+    // Also observe when report is generated or session status changes
+    const timeout = setTimeout(observeElements, 500);
+    return () => {
+      obs.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [report, isDetecting]);
+
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
       <Noise />
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px 80px" }}>
-        
+
         {/* ── HEADER ── */}
         <header className="fade-up" style={{ marginBottom: 48 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 500, color: fgMuted, marginBottom: 20, letterSpacing: 0.5 }}>
@@ -357,14 +390,14 @@ export default function FaceDetection() {
 
         {/* ── CONTROLS ── */}
         <div className="fade-up" style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 48 }}>
-          <button 
-            className="glow-btn" 
+          <button
+            className="glow-btn"
             onClick={isDetecting ? stopSession : startSession}
-            style={{ 
-              background: isDetecting ? "transparent" : fg, 
-              color: isDetecting ? fg : bg, 
+            style={{
+              background: isDetecting ? "transparent" : fg,
+              color: isDetecting ? fg : bg,
               border: isDetecting ? `1px solid ${border}` : "none",
-              borderRadius: 14, padding: "16px 32px", fontSize: 15, fontWeight: 700, 
+              borderRadius: 14, padding: "16px 32px", fontSize: 15, fontWeight: 700,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
             }}
           >
@@ -378,8 +411,8 @@ export default function FaceDetection() {
               </>
             )}
           </button>
-          
-          <div style={{ 
+
+          <div style={{
             display: "flex", alignItems: "center", gap: 12, padding: "0 24px",
             background: cardBg, borderRadius: 14, border: `1px solid ${border}`,
             fontSize: 14, color: fgMuted
@@ -389,7 +422,7 @@ export default function FaceDetection() {
           </div>
 
           {!isDetecting && !report && (
-            <button 
+            <button
               onClick={() => {
                 const demo = {
                   date: fmtDate(new Date()),
@@ -410,9 +443,9 @@ export default function FaceDetection() {
                 };
                 setReport(demo);
               }}
-              style={{ 
-                background: "transparent", color: fgMuted, border: `1px solid ${border}`, 
-                borderRadius: 14, padding: "16px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer" 
+              style={{
+                background: "transparent", color: fgMuted, border: `1px solid ${border}`,
+                borderRadius: 14, padding: "16px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer"
               }}
             >
               View Demo Report
@@ -421,11 +454,11 @@ export default function FaceDetection() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 32, alignItems: "start" }}>
-          
+
           {/* ── CAMERA FEED ── */}
           <div className="fade-up">
-            <div className="premium-card" style={{ 
-              borderRadius: 24, overflow: "hidden", 
+            <div className="premium-card" style={{
+              borderRadius: 24, overflow: "hidden",
               border: `1px solid ${border}`, background: "#000",
               aspectRatio: "4/3", display: "flex", alignItems: "center", justifyContent: "center",
               position: "relative"
@@ -448,7 +481,7 @@ export default function FaceDetection() {
 
               {isDetecting && liveStats?.currentlyAway && (
                 <div style={{
-                  position: "absolute", inset: 0, 
+                  position: "absolute", inset: 0,
                   background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)",
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   zIndex: 20, textAlign: "center", padding: 32
@@ -456,8 +489,8 @@ export default function FaceDetection() {
                   <Zap size={48} color="#fbbf24" style={{ marginBottom: 20 }} />
                   <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, margin: 0, color: "#fff" }}>DISTRACTION</h3>
                   <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, marginTop: 8 }}>{liveStats.awayLabel}</p>
-                  <div style={{ 
-                    marginTop: 24, background: "#fff", color: "#000", 
+                  <div style={{
+                    marginTop: 24, background: "#fff", color: "#000",
                     padding: "8px 24px", borderRadius: 999, fontWeight: 800, fontSize: 16
                   }}>
                     {liveStats.liveAwayTime}
@@ -465,7 +498,7 @@ export default function FaceDetection() {
                 </div>
               )}
             </div>
-            
+
             {/* Camera Accents */}
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, padding: "0 8px" }}>
               <div style={{ display: "flex", gap: 8 }}>
@@ -478,11 +511,11 @@ export default function FaceDetection() {
 
           {/* ── LIVE DATA ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            
+
             {/* Live Metrics Grid */}
-            <div className="premium-card fade-up" style={{ 
-              background: cardBg, border: `1px solid ${border}`, 
-              borderRadius: 24, padding: 32 
+            <div className="premium-card fade-up" style={{
+              background: cardBg, border: `1px solid ${border}`,
+              borderRadius: 24, padding: 32
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                 <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, margin: 0 }}>LIVE SESSION</h3>
@@ -496,13 +529,13 @@ export default function FaceDetection() {
               ) : (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <LiveStatCard label="STARTED" value={fmt(liveStats.startTime)} icon={<Calendar size={14}/>} />
-                    <LiveStatCard label="DURATION" value={liveStats.duration} icon={<Clock size={14}/>} />
-                    <LiveStatCard label="ATTENTION" value={`${liveStats.attentionPct}%`} icon={<Brain size={14}/>} 
+                    <LiveStatCard label="STARTED" value={fmt(liveStats.startTime)} icon={<Calendar size={14} />} />
+                    <LiveStatCard label="DURATION" value={liveStats.duration} icon={<Clock size={14} />} />
+                    <LiveStatCard label="ATTENTION" value={`${liveStats.attentionPct}%`} icon={<Brain size={14} />}
                       color={liveStats.attentionPct >= 75 ? "#4ade80" : liveStats.attentionPct >= 50 ? "#fbbf24" : "#f87171"} />
-                    <LiveStatCard label="AWAY TIME" value={liveStats.awayTime} icon={<Zap size={14}/>} />
-                    <LiveStatCard label="DISTRACTIONS" value={liveStats.tabSwitches} icon={<Shuffle size={14}/>} />
-                    <LiveStatCard label="ALERTS" value={liveStats.noFaceAlerts} icon={<AlertTriangle size={14}/>} />
+                    <LiveStatCard label="AWAY TIME" value={liveStats.awayTime} icon={<Zap size={14} />} />
+                    <LiveStatCard label="DISTRACTIONS" value={liveStats.tabSwitches} icon={<Shuffle size={14} />} />
+                    <LiveStatCard label="ALERTS" value={liveStats.noFaceAlerts} icon={<AlertTriangle size={14} />} />
                   </div>
 
                   <div style={{ marginTop: 24 }}>
@@ -511,10 +544,10 @@ export default function FaceDetection() {
                       <span style={{ fontWeight: 800 }}>{liveStats.attentionPct}%</span>
                     </div>
                     <div style={{ height: 6, background: border, borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ 
-                        height: "100%", width: `${liveStats.attentionPct}%`, 
-                        background: liveStats.attentionPct >= 75 ? fg : "#fbbf24", 
-                        borderRadius: 3, transition: "all 0.5s cubic-bezier(0.16,1,0.3,1)" 
+                      <div style={{
+                        height: "100%", width: `${liveStats.attentionPct}%`,
+                        background: liveStats.attentionPct >= 75 ? fg : "#fbbf24",
+                        borderRadius: 3, transition: "all 0.5s cubic-bezier(0.16,1,0.3,1)"
                       }} />
                     </div>
                   </div>
@@ -523,8 +556,8 @@ export default function FaceDetection() {
             </div>
 
             {/* Activity Stream */}
-            <div className="premium-card fade-up" style={{ 
-              background: cardBg, border: `1px solid ${border}`, 
+            <div className="premium-card fade-up" style={{
+              background: cardBg, border: `1px solid ${border}`,
               borderRadius: 24, padding: 32, flex: 1
             }}>
               <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, marginBottom: 24 }}>ACTIVITY STREAM</h3>
@@ -535,7 +568,7 @@ export default function FaceDetection() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {logs.map((log, i) => (
-                    <div key={i} style={{ 
+                    <div key={i} style={{
                       display: "flex", gap: 16, alignItems: "start", paddingBottom: 14,
                       borderBottom: i === logs.length - 1 ? "none" : `1px solid ${border}`,
                       fontSize: 13, color: log.type === 'error' ? "#f87171" : log.type === 'warn' ? "#fbbf24" : fg
@@ -552,16 +585,16 @@ export default function FaceDetection() {
 
         {/* ── SESSION REPORT ── */}
         {report && (
-          <div className="fade-up" style={{ marginTop: 80 }}>
+          <div ref={reportRef} className="fade-up" style={{ marginTop: 80 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 40 }}>
               <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, margin: 0 }}>SESSION <span style={{ color: fgMuted }}>INTELLIGENCE</span></h2>
               <div style={{ height: 1, flex: 1, background: border }} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 32, marginBottom: 40, flexWrap: "wrap" }}>
-              <div style={{ 
-                display: 'flex', alignItems: 'center', gap: '1.5rem', 
-                backgroundColor: cardBg, borderRadius: '24px', padding: '32px', 
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '1.5rem',
+                backgroundColor: cardBg, borderRadius: '24px', padding: '32px',
                 border: `1px solid ${cardBorder}`, height: "100%"
               }}>
                 <GradeIcon grade={report.grade} size={48} />
@@ -571,8 +604,8 @@ export default function FaceDetection() {
                 </div>
               </div>
 
-              <div style={{ 
-                backgroundColor: cardBg, borderRadius: '24px', padding: '32px', 
+              <div style={{
+                backgroundColor: cardBg, borderRadius: '24px', padding: '32px',
                 border: `1px solid ${cardBorder}`, position: "relative"
               }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: fgMuted, marginBottom: 16, letterSpacing: 1 }}>FOCUS PULSE</div>
@@ -581,14 +614,14 @@ export default function FaceDetection() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginBottom: 32 }}>
-              <ReportMetricCard label="Start Time"     value={report.startTime} />
-              <ReportMetricCard label="End Time"       value={report.endTime} />
+              <ReportMetricCard label="Start Time" value={report.startTime} />
+              <ReportMetricCard label="End Time" value={report.endTime} />
               <ReportMetricCard label="Total Duration" value={report.totalDuration} />
-              <ReportMetricCard label="Focused Time"   value={report.focusedTime} />
-              <ReportMetricCard label="Away Time"      value={report.awayTime} />
-              <ReportMetricCard label="Attention"      value={`${report.attentionPercent}%`} highlight />
+              <ReportMetricCard label="Focused Time" value={report.focusedTime} />
+              <ReportMetricCard label="Away Time" value={report.awayTime} />
+              <ReportMetricCard label="Attention" value={`${report.attentionPercent}%`} highlight />
               <ReportMetricCard label="No-Face Alerts" value={report.noFaceAlerts} />
-              <ReportMetricCard label="Distractions"   value={report.tabSwitches} />
+              <ReportMetricCard label="Distractions" value={report.tabSwitches} />
             </div>
 
             {/* ATTENTION BAR */}
@@ -604,14 +637,14 @@ export default function FaceDetection() {
 
             {/* DISTRACTION LOG (TIMELINE) */}
             {report.awayEvents.length > 0 && (
-              <div className="premium-card" style={{ 
-                background: cardBg, border: `1px solid ${border}`, 
+              <div className="premium-card" style={{
+                background: cardBg, border: `1px solid ${border}`,
                 borderRadius: 24, padding: 32, marginBottom: 32
               }}>
                 <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 24 }}>DISTRACTION LOG</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   {report.awayEvents.map((ev, i) => (
-                    <div key={i} style={{ 
+                    <div key={i} style={{
                       display: "grid", gridTemplateColumns: "100px 1fr 150px 100px", gap: 20,
                       padding: "16px 0", borderBottom: i === report.awayEvents.length - 1 ? "none" : `1px solid ${border}`,
                       alignItems: "center"
@@ -645,22 +678,22 @@ export default function FaceDetection() {
             </div>
 
             <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>
-              <button 
+              <button
                 className="glow-btn"
-                onClick={() => window.location.href = '/tracker'}
-                style={{ 
-                  background: fg, color: bg, border: "none", borderRadius: 12, 
+                onClick={() => navigate('/tracker')}
+                style={{
+                  background: fg, color: bg, border: "none", borderRadius: 12,
                   padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 8
                 }}
               >
                 Focus History <History size={16} />
               </button>
-              <button 
+              <button
                 className="glow-btn"
                 onClick={() => setReport(null)}
-                style={{ 
-                  background: "transparent", color: fg, border: `1px solid ${border}`, 
+                style={{
+                  background: "transparent", color: fg, border: `1px solid ${border}`,
                   borderRadius: 12, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer"
                 }}
               >
@@ -715,39 +748,50 @@ function FocusPulseChart({ data, color }) {
         style={{ transition: "all 1s ease", opacity: 0.8 }}
       />
       {data.map((v, i) => (
-        <circle 
-          key={i} 
-          cx={(i / (data.length - 1)) * 100} 
-          cy={100 - v} 
-          r="1.5" 
-          fill={color} 
+        <circle
+          key={i}
+          cx={(i / (data.length - 1)) * 100}
+          cy={100 - v}
+          r="1.5"
+          fill={color}
         />
       ))}
     </svg>
   );
 }
 
-function LiveStatCard({ label, value, icon, color }) {
+function LiveStatCard({ label, value, icon, color: customColor }) {
+  const { dark } = useTheme();
+  const cardBg = dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)";
+  const cardBorder = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const valueColor = dark ? "#fff" : "#000";
   return (
-    <div style={{ 
-      padding: '12px 16px', background: "rgba(255,255,255,0.02)", 
-      borderRadius: '12px', border: `1px solid rgba(255,255,255,0.05)`,
+    <div style={{
+      padding: '12px 16px', background: cardBg,
+      borderRadius: '12px', border: `1px solid ${cardBorder}`,
       display: 'flex', flexDirection: 'column', gap: '4px'
     }}>
-      <div style={{ fontSize: '10px', fontWeight: 800, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: color || "inherit" }}>{value}</div>
+      <div style={{ fontSize: '10px', fontWeight: 800, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: customColor || valueColor }}>{value}</div>
     </div>
   );
 }
 
 function ReportMetricCard({ label, value, highlight = false }) {
+  const { dark } = useTheme();
+  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
+  const cardBorder = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const valueColor = dark ? (highlight ? "#fff" : "rgba(255,255,255,0.85)") : (highlight ? "#000" : "rgba(0,0,0,0.85)");
+
   return (
-    <div style={{ 
-      background: "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,0.08)`, 
+    <div style={{
+      background: cardBg, border: `1px solid ${cardBorder}`,
       borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px'
     }}>
-      <div style={{ fontSize: '10px', fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: highlight ? "#fff" : "rgba(255,255,255,0.85)" }}>{value}</div>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: valueColor }}>{value}</div>
     </div>
   );
 }
@@ -756,8 +800,7 @@ function GradeIcon({ grade, size = 24 }) {
   const { dark } = useTheme();
   const color = dark ? "#fff" : "#000";
   if (grade === 'Excellent') return <Trophy size={size} color={color} />;
-  if (grade === 'Good')      return <ThumbsUp size={size} color={color} />;
-  if (grade === 'Fair')      return <TrendingUp size={size} color={color} />;
+  if (grade === 'Good') return <ThumbsUp size={size} color={color} />;
+  if (grade === 'Fair') return <TrendingUp size={size} color={color} />;
   return <AlertTriangle size={size} color={color} />;
 }
-
