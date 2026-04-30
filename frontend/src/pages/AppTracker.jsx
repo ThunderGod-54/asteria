@@ -172,31 +172,6 @@ export default function AppTracker() {
     };
   }, []);
 
-  // Separate effect to handle IntersectionObserver for dynamic content
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add("visible");
-        }
-      }),
-      { threshold: 0.1 }
-    );
-
-    const observeElements = () => {
-      document.querySelectorAll(".fade-up:not(.visible)").forEach(el => obs.observe(el));
-    };
-
-    observeElements();
-
-    // Re-run whenever sessions or filter changes
-    const timeout = setTimeout(observeElements, 300);
-    return () => {
-      obs.disconnect();
-      clearTimeout(timeout);
-    };
-  }, [sessions, filter]);
-
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
       <Noise />
@@ -351,39 +326,15 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
       </div>
 
       {expanded && (
-        <div style={{ padding: "0 24px 32px" }}>
-          <div style={{ height: 1, background: border, marginBottom: 32 }} />
+        <div style={{ padding: "0 24px 24px" }}>
+          <div style={{ height: 1, background: border, marginBottom: 24 }} />
 
-          {/* ── SESSION INTELLIGENCE HEADER ── */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
-            <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, margin: 0 }}>SESSION <span style={{ color: fgMuted }}>INTELLIGENCE</span></h2>
-            <div style={{ height: 1, flex: 1, background: border }} />
-          </div>
-
-          {/* Grade Summary Section */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '1.5rem',
-            backgroundColor: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-            borderRadius: '16px', padding: '24px 32px',
-            marginBottom: '32px', border: `1px solid ${cardBorder}`
-          }}>
-            <GradeIcon grade={s.grade} size={40} />
-            <div>
-              <div style={{ color: fg, fontWeight: 800, fontSize: '1.8rem', letterSpacing: '-0.5px', fontFamily: "'Bebas Neue', sans-serif", lineHeight: 1 }}>{s.grade.toUpperCase()}</div>
-              <div style={{ color: fgMuted, fontSize: '14px', fontWeight: 500 }}>Overall attention rating for this session</div>
-            </div>
-          </div>
-
-          {/* Full Metrics Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 40 }}>
-            <MetricCard label="Start Time" value={s.startTime} />
-            <MetricCard label="End Time" value={s.endTime} />
-            <MetricCard label="Total Duration" value={s.totalDuration} />
-            <MetricCard label="Focused Time" value={s.focusedTime} />
-            <MetricCard label="Away Time" value={s.awayTime} />
-            <MetricCard label="Attention" value={`${s.attentionPercent}%`} highlight />
-            <MetricCard label="No-Face Alerts" value={s.noFaceAlerts} />
-            <MetricCard label="Distractions" value={s.tabSwitches} />
+          {/* Expanded Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 32 }}>
+            <PillStat icon={<Target size={14} />} label="FOCUSED" value={s.focusedTime} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Zap size={14} />} label="AWAY" value={s.awayTime} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Bell size={14} />} label="ALERTS" value={s.noFaceAlerts} fg={fg} fgMuted={fgMuted} border={border} />
+            <PillStat icon={<Shuffle size={14} />} label="IDENTIFIED" value={`${s.tabSwitches} events`} fg={fg} fgMuted={fgMuted} border={border} />
           </div>
 
           {/* Attention Bar */}
@@ -399,26 +350,14 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
 
           {/* Distraction Log (Timeline) */}
           {(s.awayEvents || []).length > 0 && (
-            <div className="premium-card" style={{
-              background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-              border: `1px solid ${border}`,
-              borderRadius: 24, padding: 32, marginBottom: 32
-            }}>
-              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 24 }}>DISTRACTION LOG</h3>
+            <div style={{ marginBottom: 32 }}>
+              <h4 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1, marginBottom: 16 }}>DISTRACTION TIMELINE</h4>
               <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {s.awayEvents.map((ev, i) => (
-                  <div key={i} style={{
-                    display: "grid", gridTemplateColumns: "100px 1fr 150px 100px", gap: 20,
-                    padding: "16px 0", borderBottom: i === s.awayEvents.length - 1 ? "none" : `1px solid ${border}`,
-                    alignItems: "center"
-                  }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: fgMuted }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{ev.label}</div>
-                    <div style={{ fontSize: 12, color: fgMuted, display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ background: border, padding: "2px 8px", borderRadius: 4, fontSize: 10 }}>{ev.kind.toUpperCase()}</span>
-                      {ev.endTime ? `to ${new Date(ev.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : ""}
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, textAlign: "right" }}>{elapsed(ev.durationMs)}</div>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0", borderTop: `1px solid ${border}`, fontSize: 13 }}>
+                    <div style={{ color: fgMuted, fontSize: 11, fontWeight: 700, width: 80 }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style={{ flex: 1, fontWeight: 500 }}>{ev.label}</div>
+                    <div style={{ color: fgMuted, fontSize: 11 }}>{elapsed(ev.durationMs)}</div>
                   </div>
                 ))}
               </div>
@@ -466,24 +405,6 @@ function QuickStat({ icon, value, fgMuted, highlight }) {
   );
 }
 
-function MetricCard({ label, value, highlight = false }) {
-  const { dark } = useTheme();
-  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
-  const cardBorder = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
-  const valueColor = dark ? (highlight ? "#fff" : "rgba(255,255,255,0.85)") : (highlight ? "#000" : "rgba(0,0,0,0.85)");
-
-  return (
-    <div style={{
-      background: cardBg, border: `1px solid ${cardBorder}`,
-      borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px'
-    }}>
-      <div style={{ fontSize: '10px', fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: valueColor }}>{value}</div>
-    </div>
-  );
-}
-
 function PillStat({ icon, label, value, fg, fgMuted, border }) {
   const { dark } = useTheme();
   const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
@@ -497,6 +418,15 @@ function PillStat({ icon, label, value, fg, fgMuted, border }) {
       <div style={{ fontSize: 18, fontWeight: 700, color: fg }}>{value}</div>
     </div>
   );
+}
+
+function GradeIcon({ grade, size = 24 }) {
+  const { dark } = useTheme();
+  const color = dark ? "#000" : "#fff";
+  if (grade === 'Excellent') return <Trophy size={size} color={color} />;
+  if (grade === 'Good') return <ThumbsUp size={size} color={color} />;
+  if (grade === 'Fair') return <TrendingUp size={size} color={color} />;
+  return <AlertTriangle size={size} color={color} />;
 }
 
 function GradeIcon({ grade, size = 24 }) {
