@@ -30,7 +30,7 @@ export default function Sidebar() {
         <div style={styles.links}>
           <SidebarLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" collapsed={collapsed} />
           <SidebarLink to="/face" icon={<ScanFace size={20} />} label="Face" collapsed={collapsed} />
-          <SidebarLink to="/tracker" icon={<ActivitySquare size={20} />} label="Tracker" collapsed={collapsed} />
+          <SidebarLink to="/tracker" icon={<ActivitySquare size={20} />} label="Track History" collapsed={collapsed} />
           <SidebarLink to="/ai" icon={<Bot size={20} />} label="AI" collapsed={collapsed} />
           <SidebarLink to="/tools" icon={<Wrench size={20} />} label="Tools" collapsed={collapsed} />
         </div>
