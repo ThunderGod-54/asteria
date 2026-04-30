@@ -427,13 +427,4 @@ function GradeIcon({ grade, size = 24 }) {
   if (grade === 'Good') return <ThumbsUp size={size} color={color} />;
   if (grade === 'Fair') return <TrendingUp size={size} color={color} />;
   return <AlertTriangle size={size} color={color} />;
-}
-
-function GradeIcon({ grade, size = 24 }) {
-  const { dark } = useTheme();
-  const color = dark ? "#000" : "#fff";
-  if (grade === 'Excellent') return <Trophy size={size} color={color} />;
-  if (grade === 'Good') return <ThumbsUp size={size} color={color} />;
-  if (grade === 'Fair') return <TrendingUp size={size} color={color} />;
-  return <AlertTriangle size={size} color={color} />;
-}
+}
