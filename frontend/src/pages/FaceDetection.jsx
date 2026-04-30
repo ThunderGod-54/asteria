@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaceDetector } from 'face-detection-module';
 import { saveSession } from '../services/sessionStore';
 import { 
@@ -38,6 +39,7 @@ const Noise = () => (
 
 export default function FaceDetection() {
   const { dark } = useTheme();
+  const navigate = useNavigate();
   const [isDetecting, setIsDetecting] = useState(false);
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('Idle');
@@ -48,6 +50,7 @@ export default function FaceDetection() {
   const sessionRef = useRef(null);
   const awayEvents = useRef([]);
   const openEvent = useRef(null);
+  const reportRef = useRef(null);
   const tickRef = useRef(null);
   const alertAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
 
@@ -197,6 +200,11 @@ export default function FaceDetection() {
     setStatus('Idle');
     addLog('Session ended', 'info');
     setIsDetecting(false);
+
+    // Auto-scroll to report after a short delay to allow DOM update
+    setTimeout(() => {
+      reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const liveStats = (() => {
@@ -333,6 +341,31 @@ export default function FaceDetection() {
       obs.disconnect();
     };
   }, [fgMuted]);
+
+  // Separate effect to handle IntersectionObserver for dynamic content
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { 
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+        }
+      }),
+      { threshold: 0.1 }
+    );
+
+    const observeElements = () => {
+      document.querySelectorAll(".fade-up:not(.visible)").forEach(el => obs.observe(el));
+    };
+
+    observeElements();
+    
+    // Also observe when report is generated or session status changes
+    const timeout = setTimeout(observeElements, 500);
+    return () => {
+      obs.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [report, isDetecting]);
 
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
@@ -520,7 +553,7 @@ export default function FaceDetection() {
 
         {/* ── SESSION REPORT ── */}
         {report && (
-          <div className="fade-up" style={{ marginTop: 80 }}>
+          <div ref={reportRef} className="fade-up" style={{ marginTop: 80 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 40 }}>
               <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, margin: 0 }}>SESSION <span style={{ color: fgMuted }}>INTELLIGENCE</span></h2>
               <div style={{ height: 1, flex: 1, background: border }} />
@@ -605,7 +638,7 @@ export default function FaceDetection() {
             <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center" }}>
               <button 
                 className="glow-btn"
-                onClick={() => window.location.href = '/tracker'}
+                onClick={() => navigate('/tracker')}
                 style={{ 
                   background: fg, color: bg, border: "none", borderRadius: 12, 
                   padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer",
@@ -648,27 +681,39 @@ export default function FaceDetection() {
   );
 }
 
-function LiveStatCard({ label, value, icon, color }) {
+function LiveStatCard({ label, value, icon, color: customColor }) {
+  const { dark } = useTheme();
+  const cardBg = dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)";
+  const cardBorder = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const valueColor = dark ? "#fff" : "#000";
+
   return (
     <div style={{ 
-      padding: '12px 16px', background: "rgba(255,255,255,0.02)", 
-      borderRadius: '12px', border: `1px solid rgba(255,255,255,0.05)`,
+      padding: '12px 16px', background: cardBg, 
+      borderRadius: '12px', border: `1px solid ${cardBorder}`,
       display: 'flex', flexDirection: 'column', gap: '4px'
     }}>
-      <div style={{ fontSize: '10px', fontWeight: 800, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: color || "inherit" }}>{value}</div>
+      <div style={{ fontSize: '10px', fontWeight: 800, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: customColor || valueColor }}>{value}</div>
     </div>
   );
 }
 
 function ReportMetricCard({ label, value, highlight = false }) {
+  const { dark } = useTheme();
+  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
+  const cardBorder = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const valueColor = dark ? (highlight ? "#fff" : "rgba(255,255,255,0.85)") : (highlight ? "#000" : "rgba(0,0,0,0.85)");
+
   return (
     <div style={{ 
-      background: "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,0.08)`, 
+      background: cardBg, border: `1px solid ${cardBorder}`, 
       borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px'
     }}>
-      <div style={{ fontSize: '10px', fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 700, color: highlight ? "#fff" : "rgba(255,255,255,0.85)" }}>{value}</div>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: valueColor }}>{value}</div>
     </div>
   );
 }

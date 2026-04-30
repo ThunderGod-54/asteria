@@ -144,6 +144,19 @@ export default function AppTracker() {
         transition: opacity 0.3s;
       }
       .glow-btn:hover::after { opacity: 1; }
+
+      .insight-item {
+        position: relative;
+        padding-left: 20px;
+        margin-bottom: 12px;
+        line-height: 1.6;
+      }
+      .insight-item::before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        color: ${fgMuted};
+      }
     `;
     document.head.appendChild(style);
 
@@ -158,6 +171,31 @@ export default function AppTracker() {
       obs.disconnect();
     };
   }, []);
+
+  // Separate effect to handle IntersectionObserver for dynamic content
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { 
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+        }
+      }),
+      { threshold: 0.1 }
+    );
+
+    const observeElements = () => {
+      document.querySelectorAll(".fade-up:not(.visible)").forEach(el => obs.observe(el));
+    };
+
+    observeElements();
+    
+    // Re-run whenever sessions or filter changes
+    const timeout = setTimeout(observeElements, 300);
+    return () => {
+      obs.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [sessions, filter]);
 
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
@@ -265,10 +303,15 @@ export default function AppTracker() {
 }
 
 function OverviewStat({ num, label, highlight }) {
+  const { dark } = useTheme();
+  const highlightColor = dark ? "#fff" : "#000";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const borderColor = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+
   return (
-    <div style={{ textAlign: "center", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "0 24px" }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, color: highlight ? "#fff" : "inherit", lineHeight: 1, marginBottom: 8 }}>{num}</div>
-      <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.35)", letterSpacing: 1.5 }}>{label}</div>
+    <div style={{ textAlign: "center", borderRight: `1px solid ${borderColor}`, padding: "0 24px" }}>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, color: highlight ? highlightColor : "inherit", lineHeight: 1, marginBottom: 8 }}>{num}</div>
+      <div style={{ fontSize: 10, fontWeight: 800, color: labelColor, letterSpacing: 1.5 }}>{label}</div>
     </div>
   );
 }
@@ -308,54 +351,105 @@ function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownlo
       </div>
 
       {expanded && (
-        <div style={{ padding: "0 24px 24px" }}>
-          <div style={{ height: 1, background: border, marginBottom: 24 }} />
+        <div style={{ padding: "0 24px 32px" }}>
+          <div style={{ height: 1, background: border, marginBottom: 32 }} />
           
-          {/* Expanded Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 32 }}>
-            <PillStat icon={<Target size={14} />} label="FOCUSED" value={s.focusedTime} fg={fg} fgMuted={fgMuted} border={border} />
-            <PillStat icon={<Zap size={14} />} label="AWAY" value={s.awayTime} fg={fg} fgMuted={fgMuted} border={border} />
-            <PillStat icon={<Bell size={14} />} label="ALERTS" value={s.noFaceAlerts} fg={fg} fgMuted={fgMuted} border={border} />
-            <PillStat icon={<Shuffle size={14} />} label="IDENTIFIED" value={`${s.tabSwitches} events`} fg={fg} fgMuted={fgMuted} border={border} />
+          {/* ── SESSION INTELLIGENCE HEADER ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
+            <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, margin: 0 }}>SESSION <span style={{ color: fgMuted }}>INTELLIGENCE</span></h2>
+            <div style={{ height: 1, flex: 1, background: border }} />
+          </div>
+
+          {/* Grade Summary Section */}
+          <div style={{ 
+            display: 'flex', alignItems: 'center', gap: '1.5rem', 
+            backgroundColor: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", 
+            borderRadius: '16px', padding: '24px 32px', 
+            marginBottom: '32px', border: `1px solid ${cardBorder}` 
+          }}>
+            <GradeIcon grade={s.grade} size={40} />
+            <div>
+              <div style={{ color: fg, fontWeight: 800, fontSize: '1.8rem', letterSpacing: '-0.5px', fontFamily: "'Bebas Neue', sans-serif", lineHeight: 1 }}>{s.grade.toUpperCase()}</div>
+              <div style={{ color: fgMuted, fontSize: '14px', fontWeight: 500 }}>Overall attention rating for this session</div>
+            </div>
+          </div>
+
+          {/* Full Metrics Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 40 }}>
+            <MetricCard label="Start Time"     value={s.startTime} />
+            <MetricCard label="End Time"       value={s.endTime} />
+            <MetricCard label="Total Duration" value={s.totalDuration} />
+            <MetricCard label="Focused Time"   value={s.focusedTime} />
+            <MetricCard label="Away Time"      value={s.awayTime} />
+            <MetricCard label="Attention"      value={`${s.attentionPercent}%`} highlight />
+            <MetricCard label="No-Face Alerts" value={s.noFaceAlerts} />
+            <MetricCard label="Distractions"   value={s.tabSwitches} />
           </div>
 
           {/* Attention Bar */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 12 }}>
-              <span style={{ color: fgMuted, fontWeight: 700 }}>ATTENTION ANALYSIS</span>
-              <span style={{ fontWeight: 800 }}>{s.attentionPercent}%</span>
+          <div style={{ marginBottom: '40px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ color: fgMuted, fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Attention Score</span>
+              <span style={{ color: fg, fontWeight: 800, fontSize: '14px' }}>{s.attentionPercent}%</span>
             </div>
-            <div style={{ height: 6, background: border, borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: 6, background: border, borderRadius: 3, overflow: 'hidden' }}>
               <div style={{ height: "100%", width: `${s.attentionPercent}%`, background: fg, borderRadius: 3 }} />
             </div>
           </div>
 
-          {/* Activity Log */}
+          {/* Distraction Log (Timeline) */}
           {(s.awayEvents || []).length > 0 && (
-            <div style={{ marginBottom: 32 }}>
-              <h4 style={{ fontSize: 11, fontWeight: 800, color: fgMuted, letterSpacing: 1, marginBottom: 16 }}>DISTRACTION TIMELINE</h4>
+            <div className="premium-card" style={{ 
+              background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", 
+              border: `1px solid ${border}`, 
+              borderRadius: 24, padding: 32, marginBottom: 32
+            }}>
+              <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 24 }}>DISTRACTION LOG</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {s.awayEvents.map((ev, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0", borderTop: `1px solid ${border}`, fontSize: 13 }}>
-                    <div style={{ color: fgMuted, fontSize: 11, fontWeight: 700, width: 80 }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div style={{ flex: 1, fontWeight: 500 }}>{ev.label}</div>
-                    <div style={{ color: fgMuted, fontSize: 11 }}>{elapsed(ev.durationMs)}</div>
+                  <div key={i} style={{ 
+                    display: "grid", gridTemplateColumns: "100px 1fr 150px 100px", gap: 20,
+                    padding: "16px 0", borderBottom: i === s.awayEvents.length - 1 ? "none" : `1px solid ${border}`,
+                    alignItems: "center"
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: fgMuted }}>{new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>{ev.label}</div>
+                    <div style={{ fontSize: 12, color: fgMuted, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ background: border, padding: "2px 8px", borderRadius: 4, fontSize: 10 }}>{ev.kind.toUpperCase()}</span>
+                      {ev.endTime ? `to ${new Date(ev.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : ""}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, textAlign: "right" }}>{elapsed(ev.durationMs)}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Insights */}
+          <div className="premium-card" style={{ background: dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)", border: `1px solid ${border}`, borderRadius: 24, padding: 32, marginBottom: 48 }}>
+            <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginBottom: 20 }}>INSIGHTS</h3>
+            <div style={{ color: fgMuted, fontSize: 14, lineHeight: 1.8 }}>
+              {s.attentionPercent >= 85 && <div className="insight-item" style={{ color: fg }}>Great focus — you maintained strong attention throughout the session.</div>}
+              {s.attentionPercent < 85 && s.attentionPercent >= 65 && <div className="insight-item">Good session. A few attention dips — try minimizing distractions.</div>}
+              {s.attentionPercent < 65 && <div className="insight-item">Attention was low. Consider shorter sessions with breaks.</div>}
+              {s.tabSwitches === 0 && <div className="insight-item" style={{ color: fg }}>Zero distractions — excellent focus environment!</div>}
+              {s.tabSwitches > 0 && s.tabSwitches <= 3 && <div className="insight-item">Minimal distractions ({s.tabSwitches}) — good discipline.</div>}
+              {s.tabSwitches > 3 && <div className="insight-item">You left the session {s.tabSwitches} times — try closing other apps before starting.</div>}
+              {(s.awayEvents || []).some(e => e.durationMs > 60000) && <div className="insight-item">At least one distraction lasted over a minute — consider using Do Not Disturb mode.</div>}
+              {s.noFaceAlerts > 3 && <div className="insight-item">Multiple no-face alerts — make sure you're seated in front of the camera.</div>}
+            </div>
+          </div>
+
           {/* Actions */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button onClick={onDownloadTxt} style={{ background: border, color: fg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-              <FileText size={14} /> TXT
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${border}`, paddingTop: 32 }}>
+            <button onClick={onDownloadTxt} style={{ background: fg, color: bg, border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <FileText size={16} /> Download Report
             </button>
-            <button onClick={onDownloadJSON} style={{ background: border, color: fg, border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-              <FileJson size={14} /> JSON
+            <button onClick={onDownloadJSON} style={{ background: "transparent", color: fg, border: `1px solid ${border}`, borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <FileJson size={16} /> JSON
             </button>
-            <button onClick={onDelete} style={{ marginLeft: "auto", background: "transparent", color: "#f87171", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-              <Trash2 size={14} /> Delete
+            <button onClick={onDelete} style={{ marginLeft: "auto", background: "transparent", color: "#f87171", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={16} /> Delete
             </button>
           </div>
         </div>
@@ -372,13 +466,44 @@ function QuickStat({ icon, value, fgMuted, highlight }) {
   );
 }
 
-function PillStat({ icon, label, value, fg, fgMuted, border }) {
+function MetricCard({ label, value, highlight = false }) {
+  const { dark } = useTheme();
+  const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)";
+  const cardBorder = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const valueColor = dark ? (highlight ? "#fff" : "rgba(255,255,255,0.85)") : (highlight ? "#000" : "rgba(0,0,0,0.85)");
+
   return (
-    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${border}`, borderRadius: 12, padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, color: fgMuted, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, marginBottom: 4 }}>
+    <div style={{ 
+      background: cardBg, border: `1px solid ${cardBorder}`, 
+      borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px'
+    }}>
+      <div style={{ fontSize: '10px', fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+      <div style={{ fontSize: '18px', fontWeight: 700, color: valueColor }}>{value}</div>
+    </div>
+  );
+}
+
+function PillStat({ icon, label, value, fg, fgMuted, border }) {
+  const { dark } = useTheme();
+  const labelColor = dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
+  const bgColor = dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)";
+
+  return (
+    <div style={{ background: bgColor, border: `1px solid ${border}`, borderRadius: 12, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, color: labelColor, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, marginBottom: 4 }}>
         {icon} {label}
       </div>
       <div style={{ fontSize: 18, fontWeight: 700, color: fg }}>{value}</div>
     </div>
   );
+}
+
+function GradeIcon({ grade, size = 24 }) {
+  const { dark } = useTheme();
+  const color = dark ? "#000" : "#fff";
+  if (grade === 'Excellent') return <Trophy size={size} color={color} />;
+  if (grade === 'Good')      return <ThumbsUp size={size} color={color} />;
+  if (grade === 'Fair')      return <TrendingUp size={size} color={color} />;
+  return <AlertTriangle size={size} color={color} />;
 }
