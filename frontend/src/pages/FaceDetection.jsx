@@ -86,17 +86,40 @@ export default function FaceDetection() {
       let ticks = 0;
       tickRef.current = setInterval(() => {
         ticks++;
-        if (ticks % 30 === 0 && sessionRef.current) {
-          const s = sessionRef.current;
+        const s = sessionRef.current;
+        if (ticks % 30 === 0 && s) {
           const currentPct = pct(s.faceFrames, s.faceFrames + s.noFaceAlerts);
           s.pulse.push(currentPct);
+        }
+        // Write live stats to localStorage so AppTracker can read in real-time
+        if (s) {
+          const now = new Date();
+          const totalMs = now - s.startTime;
+          const liveAway = openEvent.current ? now - openEvent.current.startTime : 0;
+          const awayMs = s.totalAwayMs + liveAway;
+          const liveData = {
+            duration: elapsed(totalMs),
+            attentionPct: pct(s.faceFrames, s.faceFrames + s.noFaceAlerts),
+            tabSwitches: s.tabSwitches,
+            noFaceAlerts: s.noFaceAlerts,
+            awayTime: elapsed(awayMs),
+            currentlyAway: !!openEvent.current,
+            awayLabel: openEvent.current?.label ?? null,
+            startedAt: s.startTime.toISOString(),
+          };
+          localStorage.setItem('zenith_live_session', JSON.stringify(liveData));
         }
         forceRender(n => n + 1);
       }, 1000);
     } else {
       clearInterval(tickRef.current);
+      // Clear live session data when stopped
+      localStorage.removeItem('zenith_live_session');
     }
-    return () => clearInterval(tickRef.current);
+    return () => {
+      clearInterval(tickRef.current);
+      localStorage.removeItem('zenith_live_session');
+    };
   }, [isDetecting]);
 
   useEffect(() => {

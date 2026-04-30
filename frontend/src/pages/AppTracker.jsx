@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Trophy, ThumbsUp, TrendingUp, AlertTriangle,
   Eye, Bell, Shuffle, Clock, Timer, Target,
@@ -87,6 +87,8 @@ export default function AppTracker() {
   const [selected, setSelected] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [liveSession, setLiveSession] = useState(null);
+  const pollRef = useRef(null);
 
   const bg = dark ? "#080808" : "#F5F5F0";
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
@@ -95,38 +97,87 @@ export default function AppTracker() {
   const cardBg = dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
   const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  // Load sessions on mount — local first, then merge cloud if logged in
+  useEffect(() => {
     const local = getSessions();
-    let cloud = [];
-
-    if (auth.currentUser) {
-      try {
-        const q = query(
-          collection(db, "sessions"),
-          where("userId", "==", auth.currentUser.uid),
-          orderBy("createdAt", "desc")
-        );
-        const snap = await getDocs(q);
-        cloud = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-      } catch (e) {
-        console.error("Cloud Fetch Error:", e);
-      }
-    }
-
-    setSessions(cloud.length > 0 ? cloud : local);
+    setSessions(local);
     setLoading(false);
+
+    // Try cloud merge in background
+    if (auth.currentUser) {
+      setLoading(true);
+      const q = query(
+        collection(db, "sessions"),
+        where("userId", "==", auth.currentUser.uid),
+        orderBy("createdAt", "desc")
+      );
+      getDocs(q)
+        .then(snap => {
+          const cloud = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+          if (cloud.length > 0) setSessions(cloud);
+        })
+        .catch(e => console.error("Cloud Fetch Error:", e))
+        .finally(() => setLoading(false));
+    }
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  // Real-time: poll localStorage every 2s for new sessions + live session data
+  useEffect(() => {
+    const tick = () => {
+      // Live session banner
+      try {
+        const live = JSON.parse(localStorage.getItem('zenith_live_session') || 'null');
+        setLiveSession(live);
+      } catch { setLiveSession(null); }
 
-  const handleDelete = (id) => { deleteSession(id); if (selected === id) setSelected(null); reload(); };
-  const handleClearAll = () => { clearAllSessions(); setSelected(null); setConfirmClear(false); reload(); };
+      // Pick up newly saved sessions immediately
+      const current = getSessions();
+      setSessions(prev => {
+        if (current.length !== prev.length) return current;
+        return prev;
+      });
+    };
+
+    tick();
+    pollRef.current = setInterval(tick, 2000);
+
+    const onStorage = (e) => {
+      if (e.key === 'zenith_sessions' || e.key === 'zenith_live_session') tick();
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      clearInterval(pollRef.current);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  const handleDelete = (id) => {
+    deleteSession(id);
+    if (selected === id) setSelected(null);
+    setSessions(getSessions());
+  };
+  const handleClearAll = () => {
+    clearAllSessions();
+    setSelected(null);
+    setConfirmClear(false);
+    setSessions([]);
+  };
 
   const filtered = filter === 'all' ? sessions : sessions.filter(s => s.grade === filter);
   const total = sessions.length;
   const avgAttn = total === 0 ? 0 : Math.round(sessions.reduce((a, s) => a + (s.attentionPercent || 0), 0) / total);
   const best = total === 0 ? null : sessions.reduce((a, s) => s.attentionPercent > a.attentionPercent ? s : a, sessions[0]);
+
+  // Re-run IntersectionObserver whenever sessions change so cards become visible
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
+      { threshold: 0.05 }
+    );
+    document.querySelectorAll(".fade-up:not(.visible)").forEach(el => obs.observe(el));
+    return () => obs.disconnect();
+  }, [sessions, filter]);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -189,18 +240,15 @@ export default function AppTracker() {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
+      @keyframes livePulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.3); }
+      }
     `;
     document.head.appendChild(style);
 
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
-      { threshold: 0.1 }
-    );
-    document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
-
     return () => {
       document.head.removeChild(style);
-      obs.disconnect();
     };
   }, []);
 
@@ -209,6 +257,35 @@ export default function AppTracker() {
       <Noise />
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "60px 24px 100px", position: "relative", zIndex: 1 }}>
+
+        {/* ── LIVE SESSION BANNER ── */}
+        {liveSession && (
+          <div className="fade-up" style={{
+            background: dark ? "rgba(74,222,128,0.08)" : "rgba(22,163,74,0.06)",
+            border: `1px solid rgba(74,222,128,0.3)`,
+            borderRadius: 20, padding: "20px 28px", marginBottom: 32,
+            display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 12px #4ade80", animation: "livePulse 1.5s infinite" }} />
+              <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1, color: "#4ade80" }}>LIVE SESSION IN PROGRESS</span>
+            </div>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+              <LiveBannerStat label="DURATION" value={liveSession.duration ?? '—'} />
+              <LiveBannerStat label="ATTENTION" value={liveSession.attentionPct != null ? `${liveSession.attentionPct}%` : '—'} color={
+                liveSession.attentionPct >= 75 ? "#4ade80" : liveSession.attentionPct >= 50 ? "#fbbf24" : "#f87171"
+              } />
+              <LiveBannerStat label="DISTRACTIONS" value={liveSession.tabSwitches ?? 0} />
+              <LiveBannerStat label="ALERTS" value={liveSession.noFaceAlerts ?? 0} />
+              <LiveBannerStat label="AWAY TIME" value={liveSession.awayTime ?? '0s'} />
+            </div>
+            {liveSession.currentlyAway && (
+              <div style={{ marginLeft: "auto", background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 10, padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#f87171" }}>
+                ⚠ AWAY — {liveSession.awayLabel || 'Distracted'}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── HEADER ── */}
         <header className="fade-up" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 60, flexWrap: "wrap", gap: 24 }}>
@@ -316,6 +393,15 @@ export default function AppTracker() {
   );
 }
 
+function LiveBannerStat({ label, value, color }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(74,222,128,0.6)", letterSpacing: 1.5 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: color || "#fff" }}>{value}</div>
+    </div>
+  );
+}
+
 function OverviewStat({ num, label, highlight }) {
   const { dark } = useTheme();
   const highlightColor = dark ? "#fff" : "#000";
@@ -331,10 +417,11 @@ function OverviewStat({ num, label, highlight }) {
 }
 
 function SessionCard({ session: s, index, expanded, onToggle, onDelete, onDownloadTxt, onDownloadJSON, fg, fgMuted, border, cardBg, cardBorder }) {
+  const { dark } = useTheme();
   return (
     <div className="fade-up premium-card" style={{
       background: cardBg, border: `1px solid ${expanded ? fg : cardBorder}`,
-      borderRadius: 20, overflow: "hidden"
+      borderRadius: 20
     }}>
       <div style={{ padding: 24, cursor: "pointer" }} onClick={onToggle}>
         <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
