@@ -1,15 +1,37 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../Theme";
-import { 
-  Sun, Moon, LayoutDashboard, ScanFace, ActivitySquare, 
-  Bot, Wrench, Menu, ChevronLeft, ArrowLeft, LogOut, Settings
+import {
+  Sun, Moon, LayoutDashboard, ScanFace, ActivitySquare,
+  Bot, Wrench, Menu, ChevronLeft, ArrowLeft, LogOut, Settings, LogIn
 } from "lucide-react";
+import { auth, googleProvider } from "../firebase";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 
 export default function Sidebar() {
   const { dark, setDark } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Auth Error:", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+  };
   const location = useLocation();
 
   const bg = dark ? "rgba(8,8,8,0.85)" : "rgba(245,245,240,0.85)";
@@ -63,29 +85,29 @@ export default function Sidebar() {
       fontFamily: "'DM Sans', sans-serif"
     }}>
       {/* ── HEADER ── */}
-      <div style={{ 
-        display: "flex", 
-        alignItems: "center", 
+      <div style={{
+        display: "flex",
+        alignItems: "center",
         justifyContent: collapsed ? "center" : "space-between",
         marginBottom: 48,
         paddingLeft: collapsed ? 0 : 8
       }}>
         {!collapsed && (
-          <div 
+          <div
             style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 2, cursor: "pointer" }}
             onClick={() => navigate("/")}
           >
             ZENITH
           </div>
         )}
-        <button 
+        <button
           onClick={() => setCollapsed(!collapsed)}
-          style={{ 
-            background: "transparent", 
-            border: `1px solid ${border}`, 
-            color: fg, 
-            borderRadius: 8, 
-            padding: 8, 
+          style={{
+            background: "transparent",
+            border: `1px solid ${border}`,
+            color: fg,
+            borderRadius: 8,
+            padding: 8,
             cursor: "pointer",
             display: "flex",
             alignItems: "center"
@@ -129,23 +151,23 @@ export default function Sidebar() {
       </div>
 
       {/* ── FOOTER ── */}
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "column", 
-        gap: 8, 
-        paddingTop: 24, 
-        borderTop: `1px solid ${border}` 
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        paddingTop: 24,
+        borderTop: `1px solid ${border}`
       }}>
-        <button 
+        <button
           onClick={() => setDark(!dark)}
           className="sidebar-link-hover sidebar-transition"
-          style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: 16, 
-            padding: "12px 14px", 
-            borderRadius: 12, 
-            background: "transparent", 
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "transparent",
             border: "none",
             color: fgMuted,
             cursor: "pointer",
@@ -161,30 +183,62 @@ export default function Sidebar() {
           {!collapsed && <span>{dark ? "Light Mode" : "Dark Mode"}</span>}
         </button>
 
-        <button 
-          onClick={() => navigate("/")}
-          className="sidebar-link-hover sidebar-transition"
-          style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: 16, 
-            padding: "12px 14px", 
-            borderRadius: 12, 
-            background: "transparent", 
-            border: "none",
-            color: fgMuted,
-            cursor: "pointer",
-            fontSize: 15,
-            fontWeight: 500,
-            justifyContent: collapsed ? "center" : "flex-start",
-            width: "100%"
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center" }}>
-            <LogOut size={20} />
-          </span>
-          {!collapsed && <span>Logout</span>}
-        </button>
+
+        {user ? (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: activeBg,
+            marginTop: 8,
+            justifyContent: collapsed ? "center" : "flex-start"
+          }}>
+            <img
+              src={user.photoURL}
+              alt="Avatar"
+              style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${border}` }}
+            />
+            {!collapsed && (
+              <div style={{ display: "flex", flex: 1, justifyContent: "space-between", alignItems: "center", minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: fg, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user.displayName.split(' ')[0]}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  style={{ background: "transparent", border: "none", color: fgMuted, cursor: "pointer", padding: 4 }}
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={handleSignIn}
+            className="sidebar-link-hover sidebar-transition"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "transparent",
+              border: `1px solid ${border}`,
+              color: fg,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              justifyContent: collapsed ? "center" : "center",
+              marginTop: 8,
+              width: "100%"
+            }}
+          >
+            <LogIn size={18} />
+            {!collapsed && <span>Sign In</span>}
+          </button>
+        )}
       </div>
     </div>
   );

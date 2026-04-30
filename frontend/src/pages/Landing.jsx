@@ -138,14 +138,12 @@ export default function Landing() {
     `;
     document.head.appendChild(style);
 
-    // Intersection observer for fade-up
     const obs = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
       { threshold: 0.15 }
     );
     document.querySelectorAll(".fade-up").forEach(el => obs.observe(el));
 
-    // Custom cursor
     const dot = document.createElement("div");
     dot.className = "cursor-dot";
     const ring = document.createElement("div");
@@ -231,8 +229,6 @@ export default function Landing() {
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
       <Noise />
-
-      {/* ── NAVBAR ── */}
       <nav style={{
         position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
         width: "calc(100% - 48px)", maxWidth: 1100,
@@ -331,7 +327,7 @@ export default function Landing() {
               fontWeight: 500, color: fgMuted, marginBottom: 32, letterSpacing: 0.5,
             }}>
               <Sparkles size={12} />
-              PRODUCTIVITY & DEVELOPER TOOLS TRACK
+              PRODUCTIVITY & DEVELOPER TOOLS
             </div>
 
             {/* Headline */}
@@ -525,8 +521,6 @@ export default function Landing() {
           ))}
         </div>
       </section>
-
-      {/* ── TESTIMONIALS ── */}
       <section id="testimonials" style={{ padding: "120px 24px", borderTop: `1px solid ${border}` }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div className="fade-up" style={{ textAlign: "center", marginBottom: 64 }}>
@@ -565,7 +559,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── CTA BANNER ── */}
       <section style={{ padding: "80px 24px" }}>
         <div className="fade-up" style={{
           maxWidth: 900, margin: "0 auto",
@@ -593,8 +586,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
-      {/* ── FOOTER ── */}
       <footer style={{ padding: "40px 24px", borderTop: `1px solid ${border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
         <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 2 }}>ZENITH</div>
         <div style={{ color: fgMuted, fontSize: 13 }}>© 2026 Zenith. Built for deep work.</div>
