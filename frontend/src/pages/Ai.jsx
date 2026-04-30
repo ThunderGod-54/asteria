@@ -214,14 +214,14 @@ export default function Ai() {
               <Brain size={20} />
             </div>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1.5 }}>
-              ZENITH AI COACH
+              ZENITH AI
             </div>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button 
-            style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: 8, cursor: "pointer", display: "flex", alignItems: "center" }} 
+          <button
+            style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: 8, cursor: "pointer", display: "flex", alignItems: "center" }}
             onClick={() => {
               setIsMuted(!isMuted);
               window.speechSynthesis.cancel();
