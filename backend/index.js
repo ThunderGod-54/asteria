@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const { v4: uuidv4 } = require("uuid");
+const crypto = require("crypto");
 const { exec } = require("child_process");
 const os = require("os");
 const PDFDocument = require("pdfkit");
@@ -85,7 +85,7 @@ app.post("/run-code", (req, res) => {
     }
   } else {
     // Handle other languages via system exec
-    const fileId = uuidv4();
+    const fileId = crypto.randomUUID();
     const tempDir = os.platform() === 'win32' ? path.join(__dirname, "temp") : "/tmp";
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
@@ -259,7 +259,7 @@ io.on("connection", (socket) => {
   socket.on("shape-add", (shape) => {
     if (!currentRoom) return;
     const room = getRoom(currentRoom);
-    if (!shape.id) shape.id = uuidv4();
+    if (!shape.id) shape.id = crypto.randomUUID();
     room.shapes.push(shape);
     socket.to(currentRoom).emit("shape-add", shape);
   });
