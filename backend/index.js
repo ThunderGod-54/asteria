@@ -58,6 +58,28 @@ app.get("/api/face", (req, res) => {
   });
 });
 
+app.post("/run-code", (req, res) => {
+  const { code } = req.body;
+  const vm = require("vm");
+  const util = require("util");
+  
+  let output = "";
+  const customConsole = {
+    log: (...args) => { output += args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
+    error: (...args) => { output += "ERROR: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
+    warn: (...args) => { output += "WARN: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; }
+  };
+
+  try {
+    const script = new vm.Script(code);
+    const context = vm.createContext({ console: customConsole, ...global });
+    script.runInContext(context, { timeout: 1000 });
+    res.json({ output: output || "Code executed successfully (no output)." });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get("/", (req, res) => res.send("🚀 Asteria Backend Running"));
 
 // ─── Sketchly Canvas Socket.io ─────────────────────────────────────────────
