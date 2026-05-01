@@ -270,7 +270,41 @@ io.on("connection", (socket) => {
     }
   });
 });
+app.get("/", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Zenith AI | API Status</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            body { background: radial-gradient(circle at top left, #0f172a, #000000); min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: white; }
+            .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 3rem; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+            .status-dot { height: 12px; width: 12px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 15px #22c55e; animation: pulse 2s infinite; }
+            @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+        </style>
+    </head>
+    <body>
+        <div class="glass max-w-md w-full mx-4">
+            <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Zenith AI</h1>
+            <p class="text-gray-400 mb-8">Asteria Protocol Backend</p>
+            
+            <div class="bg-black/40 rounded-xl p-4 mb-6 flex items-center justify-center border border-white/5">
+                <span class="status-dot"></span>
+                <span class="font-mono text-green-400 uppercase tracking-widest text-sm">System Operational</span>
+            </div>
 
+            <div class="space-y-3">
+                <a href="https://zenithaiapp2026.web.app/" class="block w-full py-3 px-6 bg-blue-600 hover:bg-blue-500 transition-all rounded-lg font-medium">Open Frontend App</a>
+                <p class="text-xs text-gray-500 mt-6">Version 1.0.0-stable • Node.js Environment</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `);
+});
 // ─── Start ─────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 5001;
