@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { FaceDetector } from 'face-detection-module';
 import { saveSession } from '../services/sessionStore';
 import { io } from "socket.io-client";
+import toast from 'react-hot-toast';
 import {
   Trophy, ThumbsUp, TrendingUp, AlertTriangle,
   Sparkles, Play, Square, Activity, Clock, Eye,
   Shuffle, Brain, ArrowRight, Shield, Zap, Info,
-  History, BarChart2, Calendar, Target, MousePointer2
+  History, BarChart2, Calendar, Target, MousePointer2,
+  Download as DownloadIcon
 } from 'lucide-react';
 import { useTheme } from "../Theme";
 import { db, auth } from "../firebase";
@@ -80,6 +82,20 @@ export default function FaceDetection() {
         openEvent.current.label = `Switched to: ${app}`;
         addLog(`🚩 Distraction: ${app}`, 'warn');
       }
+    });
+
+    socketRef.current.on('distraction-alert', ({ message }) => {
+      console.log('Distraction alert received:', message);
+      toast.error(message, {
+        duration: 6000,
+        position: 'top-right',
+        style: {
+          background: '#333',
+          color: '#fff',
+          borderRadius: '10px',
+          zIndex: 99999,
+        },
+      });
     });
 
     if (isDetecting) {
@@ -272,6 +288,34 @@ export default function FaceDetection() {
     setTimeout(() => {
       reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!report) {
+      console.error("No report available for download");
+      return;
+    }
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5001";
+      console.log(`Attempting to download PDF from: ${apiUrl}/api/generate-pdf`);
+      const response = await fetch(`${apiUrl}/api/generate-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(report),
+      });
+      if (!response.ok) throw new Error("Failed to generate PDF");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `zenith-report-${report.date}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (error) {
+      console.error("PDF Download Error:", error);
+      toast.error("Failed to download PDF report");
+    }
   };
 
   const liveStats = (() => {
@@ -758,6 +802,17 @@ export default function FaceDetection() {
                 }}
               >
                 Focus History <History size={16} />
+              </button>
+              <button
+                className="glow-btn"
+                onClick={handleDownloadPDF}
+                style={{
+                  background: fg, color: bg, border: "none", borderRadius: 12,
+                  padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8
+                }}
+              >
+                Download Report (PDF) <DownloadIcon size={16} />
               </button>
               <button
                 className="glow-btn"

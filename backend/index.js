@@ -4,7 +4,8 @@ const { createServer } = require("http");
 const { Server } = require("socket.io");
 const { v4: uuidv4 } = require("uuid");
 const { exec } = require("child_process");
-const notifier = require("node-notifier");
+const os = require("os");
+const PDFDocument = require("pdfkit");
 
 const app = express();
 const server = createServer(app);
@@ -14,7 +15,7 @@ const io = new Server(server, {
   maxHttpBufferSize: 50e6,
 });
 
-app.use(cors({ origin: "*", methods: ["GET", "POST"], allowedHeaders: ["Content-Type"] }));
+app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
 // ─── Existing API routes ───────────────────────────────────────────────────
@@ -65,7 +66,7 @@ app.post("/run-code", (req, res) => {
   const fs = require("fs");
   const path = require("path");
   const { exec } = require("child_process");
-  
+
   if (language === "javascript") {
     let output = "";
     const customConsole = {
@@ -85,8 +86,8 @@ app.post("/run-code", (req, res) => {
   } else {
     // Handle other languages via system exec
     const fileId = uuidv4();
-    const tempDir = path.join(__dirname, "temp");
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+    const tempDir = os.platform() === 'win32' ? path.join(__dirname, "temp") : "/tmp";
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
     let fileName, execCmd;
     if (language === "python") {
@@ -94,7 +95,7 @@ app.post("/run-code", (req, res) => {
       execCmd = `python ${path.join(tempDir, fileName)}`;
     } else if (language === "cpp") {
       fileName = `${fileId}.cpp`;
-      const outName = `${fileId}.exe`;
+      const outName = os.platform() === 'win32' ? `${fileId}.exe` : `${fileId}.out`;
       execCmd = `g++ ${path.join(tempDir, fileName)} -o ${path.join(tempDir, outName)} && ${path.join(tempDir, outName)}`;
     } else if (language === "java") {
       fileName = `Main_${fileId.replace(/-/g, "")}.java`;
@@ -115,8 +116,9 @@ app.post("/run-code", (req, res) => {
       // Cleanup
       try {
         if (fs.existsSync(path.join(tempDir, fileName))) fs.unlinkSync(path.join(tempDir, fileName));
-        if (language === "cpp" && fs.existsSync(path.join(tempDir, `${fileId}.exe`))) fs.unlinkSync(path.join(tempDir, `${fileId}.exe`));
-      } catch (e) {}
+        const outName = os.platform() === 'win32' ? `${fileId}.exe` : `${fileId}.out`;
+        if (language === "cpp" && fs.existsSync(path.join(tempDir, outName))) fs.unlinkSync(path.join(tempDir, outName));
+      } catch (e) { }
 
       if (err) {
         res.status(400).json({ error: stderr || err.message });
@@ -125,6 +127,91 @@ app.post("/run-code", (req, res) => {
       }
     });
   }
+});
+
+app.post("/api/generate-pdf", (req, res) => {
+  console.log("PDF generation request received:", req.body?.date);
+  const report = req.body;
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+
+  // Set response headers
+  res.setHeader("Content-Type", "application/pdf");
+  const fileName = `zenith-report-${report.date.replace(/[/\\?%*:|"<>]/g, '-')}.pdf`;
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+
+  doc.pipe(res);
+
+  // --- Design & Layout ---
+  const primaryColor = "#0f172a";
+  const accentColor = "#3b82f6";
+  const mutedColor = "#64748b";
+
+  // Header
+  doc.rect(0, 0, 612, 120).fill(primaryColor);
+  doc.fillColor("#ffffff").fontSize(28).font("Helvetica-Bold").text("ZENITH AI", 50, 45);
+  doc.fontSize(10).font("Helvetica").text("ASTORIA PROTOCOL // FOCUS INTELLIGENCE", 50, 80, { characterSpacing: 1 });
+  doc.fontSize(10).text(new Date().toLocaleString(), 400, 45, { align: "right" });
+
+  // Title
+  doc.fillColor(primaryColor).fontSize(20).font("Helvetica-Bold").text("SESSION PERFORMANCE REPORT", 50, 150);
+  doc.rect(50, 175, 512, 2).fill(accentColor);
+
+  // Summary Grid
+  let y = 200;
+  const drawStat = (label, value, x, yPos, highlight = false) => {
+    doc.fillColor(mutedColor).fontSize(9).font("Helvetica-Bold").text(label.toUpperCase(), x, yPos);
+    doc.fillColor(highlight ? accentColor : primaryColor).fontSize(16).font("Helvetica-Bold").text(value, x, yPos + 15);
+  };
+
+  drawStat("Date", report.date, 50, y);
+  drawStat("Start Time", report.startTime, 180, y);
+  drawStat("End Time", report.endTime, 310, y);
+  drawStat("Grade", report.grade, 440, y, true);
+
+  y += 50;
+  drawStat("Duration", report.totalDuration, 50, y);
+  drawStat("Focused Time", report.focusedTime, 180, y);
+  drawStat("Attention", `${report.attentionPercent}%`, 310, y, true);
+  drawStat("Distractions", report.tabSwitches, 440, y);
+
+  // Distraction Log
+  y += 80;
+  doc.fillColor(primaryColor).fontSize(14).font("Helvetica-Bold").text("DISTRACTION TELEMETRY LOG", 50, y);
+  y += 20;
+
+  if (report.awayEvents && report.awayEvents.length > 0) {
+    // Table Header
+    doc.rect(50, y, 512, 20).fill("#f1f5f9");
+    doc.fillColor(primaryColor).fontSize(8).font("Helvetica-Bold");
+    doc.text("TIME", 60, y + 6);
+    doc.text("EVENT / APP", 150, y + 6);
+    doc.text("KIND", 400, y + 6);
+    doc.text("DURATION", 500, y + 6);
+    y += 25;
+
+    report.awayEvents.forEach((ev, i) => {
+      if (y > 700) { doc.addPage(); y = 50; }
+
+      const startTime = ev.startTime ? new Date(ev.startTime).toLocaleTimeString() : "—";
+      const duration = ev.durationMs ? (ev.durationMs / 1000).toFixed(1) + "s" : "—";
+
+      doc.fillColor(primaryColor).fontSize(9).font("Helvetica");
+      doc.text(startTime, 60, y);
+      doc.text(ev.label || "Unknown", 150, y, { width: 240 });
+      doc.text(ev.kind.toUpperCase(), 400, y);
+      doc.text(duration, 500, y);
+
+      y += 20;
+      doc.moveTo(50, y - 5).lineTo(562, y - 5).strokeColor("#e2e8f0").lineWidth(0.5).stroke();
+    });
+  } else {
+    doc.fillColor(mutedColor).fontSize(10).font("Helvetica-Oblique").text("No distraction events recorded during this session.", 50, y);
+  }
+
+  // Footer
+  doc.fontSize(8).fillColor(mutedColor).text("This report was automatically generated by the Zenith AI Focus Monitoring system..", 50, 750, { align: "center", width: 512 });
+
+  doc.end();
 });
 
 app.get("/", (req, res) => res.send("🚀 Asteria Backend Running"));
@@ -233,31 +320,12 @@ io.on("connection", (socket) => {
 
   // ─── OS-LEVEL DISTRACTION TRACKING ───
   socket.on("tab-hidden", () => {
-    // Small delay to ensure the OS registers the new active window
-    setTimeout(() => {
-      const psScript = `(Get-Process | Where-Object {$_.MainWindowHandle -ne 0} | Sort-Object LastProcessorTime -Descending | Select-Object -First 1).ProcessName`;
-      exec(`powershell "${psScript}"`, (err, stdout) => {
-        if (err) return;
-        const appName = stdout.trim();
-
-        // Skip browser processes and empty names
-        const browsers = ['brave', 'chrome', 'msedge', 'firefox', 'opera', 'zenith'];
-        const isBrowser = browsers.some(b => appName.toLowerCase().includes(b));
-
-        if (appName && !isBrowser) {
-          notifier.notify({
-            title: 'Zenith Focus Warning',
-            message: `You just opened ${appName.toUpperCase()}! Stay focused.`,
-            sound: true,
-            wait: true
-          });
-          socket.emit("distraction-log", { app: appName });
-        } else if (appName && isBrowser) {
-          // User just switched tabs but stayed in browser
-          socket.emit("distraction-log", { app: "Other Browser Tab" });
-        }
-      });
-    }, 1200);
+    console.log("Tab hidden event received, emitting distraction-alert");
+    // Simply emit a distraction-alert event to the client
+    socket.emit("distraction-alert", {
+      message: "Stay focused! You just switched away from your work."
+    });
+    socket.emit("distraction-log", { app: "Other Tab/App" });
   });
 
   socket.on("disconnect", () => {

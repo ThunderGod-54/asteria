@@ -15,6 +15,7 @@ import Tools from "./pages/Tools";
 import Sidebar from "./components/Sidebar";
 import { FaceDetector } from "face-detection-module";
 import { useSession } from "./services/sessionContext";
+import { Toaster } from "react-hot-toast";
 
 function Layout() {
   const location = useLocation();
@@ -70,6 +71,11 @@ function ToolsWithRoom() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster 
+        position="top-right" 
+        reverseOrder={false} 
+        containerStyle={{ zIndex: 99999 }}
+      />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route element={<Layout />}>

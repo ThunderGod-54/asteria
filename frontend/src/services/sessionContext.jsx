@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import toast from 'react-hot-toast';
 import { saveSession } from './sessionStore';
 import { db, auth } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
@@ -44,7 +45,8 @@ export function SessionProvider({ children }) {
   // Socket + tick
   useEffect(() => {
     if (!socketRef.current) {
-      socketRef.current = io('http://localhost:5001');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      socketRef.current = io(apiUrl);
     }
 
     socketRef.current.on('distraction-log', ({ app }) => {
@@ -52,6 +54,20 @@ export function SessionProvider({ children }) {
         openEvent.current.label = `Switched to: ${app}`;
         addLog(`🚩 Distraction: ${app}`, 'warn');
       }
+    });
+
+    socketRef.current.on('distraction-alert', ({ message }) => {
+      console.log('Distraction alert received:', message);
+      toast.error(message, {
+        duration: 6000,
+        position: 'top-right',
+        style: {
+          background: '#333',
+          color: '#fff',
+          borderRadius: '10px',
+          zIndex: 99999,
+        },
+      });
     });
 
     if (isDetecting) {
@@ -86,6 +102,7 @@ export function SessionProvider({ children }) {
     return () => {
       clearInterval(tickRef.current);
       socketRef.current?.off('distraction-log');
+      socketRef.current?.off('distraction-alert');
     };
   }, [isDetecting, addLog]);
 
