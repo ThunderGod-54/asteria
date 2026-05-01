@@ -6,6 +6,8 @@ const crypto = require("crypto");
 const { exec } = require("child_process");
 const os = require("os");
 const PDFDocument = require("pdfkit");
+const helmet = require("helmet");
+const morgan = require("morgan");
 
 const app = express();
 const server = createServer(app);
@@ -15,8 +17,14 @@ const io = new Server(server, {
   maxHttpBufferSize: 50e6,
 });
 
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for easier dev/prod integration if needed, or configure specifically
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ─── Existing API routes ───────────────────────────────────────────────────
 
@@ -374,9 +382,22 @@ app.get("/", (req, res) => {
     </html>
   `);
 });
+// ─── Global Error Handler ──────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error("Critical Server Error:", err.stack);
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: process.env.NODE_ENV === "production" ? "Something went wrong" : err.message
+  });
+});
+
 // ─── Start ─────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 5001;
-server.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+// Only listen if not in a Vercel/Serverless environment
+if (process.env.NODE_ENV !== "production") {
+  server.listen(PORT, () => console.log(`🚀 Production-ready server running on http://localhost:${PORT}`));
+}
 
 module.exports = server;
