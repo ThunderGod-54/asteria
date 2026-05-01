@@ -171,7 +171,7 @@ export default function Sidebar() {
               src={dark ? doodleDark : doodleLight}
               alt="Doodle Art"
               style={{
-                width: '110px',
+                width: '240px',
                 height: 'auto',
                 borderRadius: 12,
                 opacity: 0.6,
