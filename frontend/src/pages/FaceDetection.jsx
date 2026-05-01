@@ -813,7 +813,7 @@ export default function FaceDetection() {
                   display: "flex", alignItems: "center", gap: 8
                 }}
               >
-                Download Report (PDF) <DownloadIcon size={16} />
+                Download Report(PDF) <DownloadIcon size={16} />
               </button>
               <button
                 className="glow-btn"
