@@ -182,7 +182,7 @@ export default function Landing() {
     { icon: <LayoutDashboard size={22} />, title: "App Intelligence", desc: "Knows the difference between coding in VS Code and scrolling Reddit. Classifies every minute of screen time." },
     { icon: <Brain size={22} />, title: "AI Coach", desc: "Gemini analyzes your session patterns and tells you your peak hours, worst triggers, and optimal break schedule." },
     { icon: <BarChart2 size={22} />, title: "Focus Timeline", desc: "A minute-by-minute heatmap of your entire day — see exactly where you lost the thread." },
-    { icon: <Shield size={22} />, title: "100% Local", desc: "All data lives on your machine. Nothing sent to any cloud. Not even a screenshot." },
+    { icon: <Shield size={22} />, title: "Productivity Efficient Tools", desc: "Zenith provides you a wide range and variety of Productivity tools." },
     { icon: <Zap size={22} />, title: "Instant Nudges", desc: "Desktop alerts the moment you drift — before 5 minutes becomes 50." },
   ];
 
@@ -438,7 +438,7 @@ export default function Landing() {
       <div style={{ overflow: "hidden", padding: "32px 0", borderTop: `1px solid ${border}`, borderBottom: `1px solid ${border}` }}>
         <div className="marquee-track">
           {[...Array(2)].flatMap((_, copy) =>
-            ["FOCUS MORE", "DISTRACT LESS", "FLOW DEEPER", "WORK SMARTER", "AI-COACHED", "PRIVACY FIRST", "REAL-TIME", "100% LOCAL"].map((t, i) => (
+            ["FOCUS MORE", "DISTRACT LESS", "FLOW DEEPER", "WORK SMARTER", "AI-COACHED", "PRIVACY FIRST", "REAL-TIME", "PRODUCTIVITY TOOLS"].map((t, i) => (
               <span key={`${copy}-${t}-${i}`} style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 32, letterSpacing: 4,
