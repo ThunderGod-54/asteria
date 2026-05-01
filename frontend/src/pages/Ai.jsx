@@ -188,32 +188,55 @@ export default function Ai() {
   };
 
   return (
-    <div style={{
-      background: bg,
-      color: fg,
-      height: "100vh",
-      fontFamily: "'DM Sans', sans-serif",
-      position: "relative",
-      overflow: "hidden",
-      display: "flex",
-      flexDirection: "column"
-    }}>
+    <div
+      style={{
+        background: bg,
+        color: fg,
+        height: "100vh",
+        fontFamily: "'DM Sans', sans-serif",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Noise />
 
       {/* ── HEADER ── */}
-      <header style={{
-        height: 70, borderBottom: `1px solid ${border}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px", background: `${bg}CC`, backdropFilter: "blur(20px)",
-        zIndex: 100,
-        flexShrink: 0
-      }}>
+      <header
+        style={{
+          height: 70,
+          borderBottom: `1px solid ${border}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          background: `${bg}CC`,
+          backdropFilter: "blur(20px)",
+          zIndex: 100,
+          flexShrink: 0,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ background: fg, color: bg, borderRadius: 8, padding: 6, display: "flex" }}>
+            <div
+              style={{
+                background: fg,
+                color: bg,
+                borderRadius: 8,
+                padding: 6,
+                display: "flex",
+              }}
+            >
               <Brain size={20} />
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1.5 }}>
+            <div
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 24,
+                letterSpacing: 1.5,
+              }}
+            >
               ZENITH AI
             </div>
           </div>
@@ -221,7 +244,16 @@ export default function Ai() {
 
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: 8, cursor: "pointer", display: "flex", alignItems: "center" }}
+            style={{
+              background: "transparent",
+              border: `1px solid ${border}`,
+              color: fgMuted,
+              borderRadius: 10,
+              padding: 8,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+            }}
             onClick={() => {
               setIsMuted(!isMuted);
               window.speechSynthesis.cancel();
@@ -230,7 +262,19 @@ export default function Ai() {
           >
             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
-          <button style={{ background: "transparent", border: `1px solid ${border}`, color: fgMuted, borderRadius: 10, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }} onClick={() => setMessages([messages[0]])}>
+          <button
+            style={{
+              background: "transparent",
+              border: `1px solid ${border}`,
+              color: fgMuted,
+              borderRadius: 10,
+              padding: "8px 16px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+            onClick={() => setMessages([messages[0]])}
+          >
             CLEAR CHAT
           </button>
         </div>
@@ -245,40 +289,85 @@ export default function Ai() {
           display: "flex",
           flexDirection: "column",
           scrollBehavior: "smooth",
-          padding: "40px 24px"
+          padding: "40px 24px",
         }}
       >
-        <div style={{ maxWidth: 800, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: 32 }}>
+        <div
+          style={{
+            maxWidth: 800,
+            width: "100%",
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 32,
+          }}
+        >
           {messages.map((msg, i) => (
             <div
               key={i}
               style={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                alignItems: msg.role === "user" ? "flex-end" : "flex-start",
                 width: "100%",
-                animation: "fadeUp 0.5s ease-out forwards"
+                animation: "fadeUp 0.5s ease-out forwards",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: fgMuted, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>
-                {msg.role === 'ai' ? <><Sparkles size={12} /> ZENITH INTELLIGENCE</> : <><User size={12} /> YOU</>}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                  color: fgMuted,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                {msg.role === "ai" ? (
+                  <>
+                    <Sparkles size={12} /> ZENITH INTELLIGENCE
+                  </>
+                ) : (
+                  <>
+                    <User size={12} /> YOU
+                  </>
+                )}
               </div>
 
-              <div style={{
-                background: msg.role === 'ai' ? cardBg : "transparent",
-                border: `1px solid ${msg.role === 'ai' ? border : cardBorder}`,
-                borderRadius: 20,
-                padding: "16px 24px",
-                maxWidth: "85%",
-                color: msg.role === 'user' ? fg : fg,
-                fontSize: 15,
-                lineHeight: 1.6,
-                boxShadow: msg.role === 'ai' ? "0 4px 20px rgba(0,0,0,0.1)" : "none"
-              }}>
+              <div
+                style={{
+                  background: msg.role === "ai" ? cardBg : "transparent",
+                  border: `1px solid ${msg.role === "ai" ? border : cardBorder}`,
+                  borderRadius: 20,
+                  padding: "16px 24px",
+                  maxWidth: "85%",
+                  color: msg.role === "user" ? fg : fg,
+                  fontSize: 15,
+                  lineHeight: 1.6,
+                  boxShadow:
+                    msg.role === "ai" ? "0 4px 20px rgba(0,0,0,0.1)" : "none",
+                }}
+              >
                 <ReactMarkdown
                   components={{
-                    p: ({ node, ...props }) => <p style={{ margin: 0 }} {...props} />,
-                    code: ({ node, ...props }) => <code style={{ background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)", padding: "2px 4px", borderRadius: 4 }} {...props} />
+                    p: ({ node, ...props }) => (
+                      <p style={{ margin: 0 }} {...props} />
+                    ),
+                    code: ({ node, ...props }) => (
+                      <code
+                        style={{
+                          background: dark
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                          padding: "2px 4px",
+                          borderRadius: 4,
+                        }}
+                        {...props}
+                      />
+                    ),
                   }}
                 >
                   {msg.content}
@@ -288,21 +377,32 @@ export default function Ai() {
           ))}
 
           {loading && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", color: fgMuted }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                color: fgMuted,
+              }}
+            >
               <Zap size={14} className="spinning" />
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>ANALYZING TELEMETRY...</span>
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>
+                ANALYZING TELEMETRY...
+              </span>
             </div>
           )}
         </div>
       </main>
 
       {/* ── INPUT BAR ── */}
-      <div style={{
-        padding: "20px 24px 40px",
-        width: "100%",
-        zIndex: 100,
-        flexShrink: 0
-      }}>
+      <div
+        style={{
+          padding: "20px 24px 40px",
+          width: "100%",
+          zIndex: 100,
+          flexShrink: 0,
+        }}
+      >
         <form
           onSubmit={handleSend}
           style={{
@@ -316,7 +416,7 @@ export default function Ai() {
             display: "flex",
             alignItems: "center",
             gap: 12,
-            boxShadow: "0 10px 40px rgba(0,0,0,0.2)"
+            boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
           }}
         >
           <div style={{ padding: "0 12px", color: fgMuted }}>
@@ -334,7 +434,7 @@ export default function Ai() {
               fontSize: 15,
               padding: "12px 0",
               outline: "none",
-              fontFamily: "inherit"
+              fontFamily: "inherit",
             }}
           />
           <button
@@ -349,7 +449,7 @@ export default function Ai() {
               alignItems: "center",
               justifyContent: "center",
               padding: "0 8px",
-              transition: "all 0.3s"
+              transition: "all 0.3s",
             }}
           >
             <Mic size={24} className={isListening ? "listening" : ""} />
@@ -371,14 +471,23 @@ export default function Ai() {
               justifyContent: "center",
               cursor: input.trim() ? "pointer" : "default",
               opacity: input.trim() ? 1 : 0.3,
-              transition: "all 0.2s"
+              transition: "all 0.2s",
             }}
           >
             <ArrowUp size={36} strokeWidth={3} />
           </button>
         </form>
-        <div style={{ textAlign: "center", marginTop: 12, fontSize: 10, color: fgMuted, letterSpacing: 0.5, fontWeight: 600 }}>
-          ZENITH AI CAN MAKE MISTAKES. VERIFY CRITICAL COGNITIVE DATA.
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 12,
+            fontSize: 10,
+            color: fgMuted,
+            letterSpacing: 0.5,
+            fontWeight: 600,
+          }}
+        >
+          POWERED BY GEMINI AI AND BUILT WITH ❤️ BY TEAM ZENIN.
         </div>
       </div>
 
