@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import SketchlyCanvas from "sketchly-canvas";
 import CodeEditor from "../components/CodeEditor";
 import Pomodoro from "../components/Pomodoro";
 import MusicPlayer from "../components/MusicPlayer";
 import CalendarTool from "../components/CalendarTool";
-import StretchCanvas from "../components/StretchCanvas";
 import { 
   GraduationCap, Clock, Music, 
   Terminal, Code, PenTool, 
@@ -26,9 +26,59 @@ const Noise = () => (
   </svg>
 );
 
-export default function Tools() {
+// Renders SketchlyCanvas into a standalone root outside BrowserRouter to avoid nested Router error
+function IsolatedCanvas({ roomId, serverUrl }) {
+  const { dark } = useTheme();
+  const containerRef = useRef(null);
+  const rootRef = useRef(null);
+  const mountRef = useRef(null);
+
+  // Keep canvas theme in sync with app theme at all times
+  useEffect(() => {
+    window.__SKETCHLY_APP_ORIGIN__ = window.location.origin;
+  }, [dark]);
+
+  useEffect(() => {
+    window.__SKETCHLY_DARK__ = dark;
+    window.__SKETCHLY_APP_ORIGIN__ = window.location.origin;
+
+    const el = document.createElement("div");
+    el.style.cssText = "position:absolute;inset:0;width:100%;height:100%;";
+    mountRef.current = el;
+
+    if (containerRef.current) {
+      containerRef.current.appendChild(el);
+      rootRef.current = createRoot(el);
+      rootRef.current.render(
+        <SketchlyCanvas serverUrl={serverUrl} roomId={roomId} asHost={true} />
+      );
+    }
+
+    return () => {
+      setTimeout(() => {
+        try { rootRef.current?.unmount(); } catch {}
+        try { mountRef.current?.remove(); } catch {}
+      }, 0);
+    };
+  }, [roomId, serverUrl]);
+
+  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+}
+
+export default function Tools({ initialRoomId }) {
   const [activeCategory, setActiveCategory] = useState("dev");
   const { dark } = useTheme();
+
+  // Stable room ID — generate once, persist in sessionStorage so refreshes keep the same room
+  const canvasRoomId = useMemo(() => {
+    const stored = sessionStorage.getItem('zenith_canvas_room');
+    if (stored) return stored;
+    const id = `zenith-${Math.random().toString(36).slice(2, 9)}`;
+    sessionStorage.setItem('zenith_canvas_room', id);
+    return id;
+  }, []);
+
+  const roomId = initialRoomId || canvasRoomId;
 
   const bg = dark ? "#080808" : "#F5F5F0";
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
@@ -177,9 +227,9 @@ export default function Tools() {
                  <CalendarTool />
               </div>
 
-              {/* Stretch Canvas - Medium (2x1) */}
-              <div className="bento-card" style={{ gridColumn: "span 2" }}>
-                 <StretchCanvas />
+              {/* Sketchly Canvas - Full width (4x2) */}
+              <div style={{ gridColumn: "span 4", gridRow: "span 2", borderRadius: 24, overflow: "hidden", border: `1px solid ${cardBorder}`, minHeight: 500, position: "relative" }}>
+                <IsolatedCanvas serverUrl="http://localhost:5001" roomId={roomId} />
               </div>
             </div>
           )}
