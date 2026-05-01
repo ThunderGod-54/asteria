@@ -29,7 +29,8 @@ export default function CodeEditor() {
     setLoading(true);
     setOutput("Running Zenith Engine...");
     try {
-      const response = await fetch("http://localhost:5001/run-code", {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5001";
+      const response = await fetch(`${apiUrl}/run-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, language }),
@@ -37,7 +38,7 @@ export default function CodeEditor() {
       const data = await response.json();
       setOutput(data.output || data.error || "No output returned.");
     } catch (err) {
-      setOutput(`Error: ${err.message}\n(Make sure backend is running on port 5001)`);
+      setOutput(`Error: ${err.message}\n(Make sure the backend is running and accessible)`);
     } finally {
       setLoading(false);
     }

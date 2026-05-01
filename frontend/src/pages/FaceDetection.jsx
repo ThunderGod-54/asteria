@@ -74,7 +74,8 @@ export default function FaceDetection() {
   }, []);
 
   useEffect(() => {
-    socketRef.current = io("http://localhost:5001");
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5001";
+    socketRef.current = io(apiUrl);
 
     socketRef.current.on("distraction-log", ({ app }) => {
       // Update the most recent 'away' event with the specific app name

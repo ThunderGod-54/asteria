@@ -239,7 +239,7 @@ export default function Tools({ initialRoomId }) {
 
               {/* Sketchly Canvas - Full width (4x2) */}
               <div style={{ gridColumn: "span 4", gridRow: "span 2", borderRadius: 24, overflow: "hidden", border: `1px solid ${cardBorder}`, minHeight: 500, position: "relative" }}>
-                <IsolatedCanvas serverUrl="http://localhost:5001" roomId={roomId} />
+                <IsolatedCanvas serverUrl={import.meta.env.VITE_API_URL || "http://localhost:5001"} roomId={roomId} />
               </div>
             </div>
           )}
