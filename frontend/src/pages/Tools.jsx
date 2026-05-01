@@ -6,9 +6,12 @@ import CodeEditor from "../components/CodeEditor";
 import Pomodoro from "../components/Pomodoro";
 import MusicPlayer from "../components/MusicPlayer";
 import CalendarTool from "../components/CalendarTool";
-import { 
-  GraduationCap, Clock, Music, 
-  Terminal, Code, PenTool, 
+import StudyPlanner from "../components/StudyPlanner";
+import ResourceHub from "../components/ResourceHub";
+import NoteTaker from "../components/NoteTaker";
+import {
+  GraduationCap, Clock, Music,
+  Terminal, Code, PenTool,
   FileText, Settings, Share2,
   Sparkles, ArrowRight, ChevronRight,
   Monitor, Layout, Briefcase,
@@ -57,8 +60,8 @@ function IsolatedCanvas({ roomId, serverUrl }) {
 
     return () => {
       setTimeout(() => {
-        try { rootRef.current?.unmount(); } catch {}
-        try { mountRef.current?.remove(); } catch {}
+        try { rootRef.current?.unmount(); } catch { }
+        try { mountRef.current?.remove(); } catch { }
       }, 0);
     };
   }, [roomId, serverUrl]);
@@ -162,7 +165,7 @@ export default function Tools({ initialRoomId }) {
       <Noise />
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px 120px", position: "relative", zIndex: 1 }}>
-        
+
         {/* HEADER */}
         <header className="fade-up" style={{ marginBottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
           <div>
@@ -174,31 +177,10 @@ export default function Tools({ initialRoomId }) {
             </h1>
           </div>
 
-          <button 
-            onClick={() => setDark(!dark)}
-            style={{
-              background: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-              border: `1px solid ${border}`,
-              color: fg,
-              borderRadius: 12,
-              padding: "10px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: 600,
-              transition: "all 0.3s",
-              fontFamily: "inherit"
-            }}
-          >
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
-            <span>{dark ? "Light Mode" : "Dark Mode"}</span>
-          </button>
         </header>
 
         <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 40 }}>
-          
+
           {/* Category Title */}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, letterSpacing: 1, margin: 0 }}>
@@ -231,25 +213,25 @@ export default function Tools({ initialRoomId }) {
           )}
 
           {activeCategory === 'common' && (
-            <div style={{ 
-              display: "grid", 
-              gridTemplateColumns: "repeat(4, 1fr)", 
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
               gridAutoRows: "minmax(200px, auto)",
-              gap: 24 
+              gap: 24
             }}>
-              {/* Pomodoro - Small (1x1) */}
-              <div className="bento-card" style={{ gridColumn: "span 1" }}>
-                 <Pomodoro />
+              {/* Pomodoro - Medium (2x1) */}
+              <div className="bento-card" style={{ gridColumn: "span 2" }}>
+                <Pomodoro />
               </div>
 
-              {/* Music Player - Small (1x1) */}
-              <div className="bento-card" style={{ gridColumn: "span 1" }}>
-                 <MusicPlayer />
+              {/* Music Player - Medium (2x1) */}
+              <div className="bento-card" style={{ gridColumn: "span 2" }}>
+                <MusicPlayer />
               </div>
 
-              {/* Calendar - Large (2x2) */}
-              <div className="bento-card" style={{ gridColumn: "span 2", gridRow: "span 2" }}>
-                 <CalendarTool />
+              {/* Calendar - Large (4x2) */}
+              <div className="bento-card" style={{ gridColumn: "span 4", gridRow: "span 2" }}>
+                <CalendarTool />
               </div>
 
               {/* Sketchly Canvas - Full width (4x2) */}
@@ -260,13 +242,40 @@ export default function Tools({ initialRoomId }) {
           )}
 
           {activeCategory === 'student' && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
-              {['Study Planner', 'Resource Hub', 'Note Taker'].map((t, i) => (
-                <div key={t} className="bento-card">
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{t}</h3>
-                  <p style={{ color: fgMuted, fontSize: 14 }}>Essential tool for academic focus and session management.</p>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gridAutoRows: "minmax(250px, auto)",
+              gap: 24
+            }}>
+              {/* Note Taker - Full Width (4x2) */}
+              <div className="bento-card" style={{ gridColumn: "span 4", gridRow: "span 2", minHeight: 600 }}>
+                <NoteTaker />
+              </div>
+
+              {/* Study Planner - Wide (2x2) */}
+              <div className="bento-card" style={{ gridColumn: "span 2", gridRow: "span 2" }}>
+                <StudyPlanner />
+              </div>
+
+              {/* Middle Stats - Stacked (1x2) */}
+              <div style={{ gridColumn: "span 1", gridRow: "span 2", display: "flex", flexDirection: "column", gap: 24 }}>
+                <div className="bento-card" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: fgMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>Sessions</div>
+                  <div style={{ fontSize: 32, fontWeight: 700 }}>12</div>
+                  <div style={{ fontSize: 12, color: fgMuted, marginTop: 4 }}>Completed this week</div>
                 </div>
-              ))}
+                <div className="bento-card" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: fgMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>Focus</div>
+                  <div style={{ fontSize: 32, fontWeight: 700 }}>92%</div>
+                  <div style={{ fontSize: 12, color: fgMuted, marginTop: 4 }}>Efficiency score</div>
+                </div>
+              </div>
+
+              {/* Resource Hub - Tall (1x2) */}
+              <div className="bento-card" style={{ gridColumn: "span 1", gridRow: "span 2" }}>
+                <ResourceHub />
+              </div>
             </div>
           )}
         </div>

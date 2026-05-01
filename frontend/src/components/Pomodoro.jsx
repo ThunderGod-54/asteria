@@ -46,8 +46,22 @@ export default function Pomodoro() {
     setSeconds(0);
   };
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editMinutes, setEditMinutes] = useState(minutes);
+
+  const handleManualSet = (e) => {
+    e.preventDefault();
+    const val = parseInt(editMinutes);
+    if (!isNaN(val) && val > 0 && val < 1000) {
+      setMinutes(val);
+      setSeconds(0);
+      setIsActive(false);
+    }
+    setIsEditing(false);
+  };
+
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 12 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: fgMuted, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>
         <Clock size={12} /> Pomodoro
       </div>
@@ -58,9 +72,37 @@ export default function Pomodoro() {
         <button onClick={() => setTime(15)} style={{ background: minutes === 15 ? (dark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)") : "transparent", color: fg, border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 800, cursor: "pointer", transition: "all 0.2s" }}>LONG</button>
       </div>
 
-      <div style={{ fontSize: 44, fontWeight: 700, fontFamily: "'Bebas Neue', sans-serif", letterSpacing: 2, color: fg }}>
-        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-      </div>
+      {isEditing ? (
+        <form onSubmit={handleManualSet}>
+          <input 
+            autoFocus
+            type="number"
+            value={editMinutes}
+            onChange={(e) => setEditMinutes(e.target.value)}
+            onBlur={handleManualSet}
+            style={{ 
+              fontSize: 44, 
+              fontWeight: 700, 
+              fontFamily: "'Bebas Neue', sans-serif", 
+              width: 100, 
+              textAlign: "center", 
+              background: "transparent", 
+              border: "none", 
+              color: fg, 
+              outline: "none" 
+            }}
+          />
+        </form>
+      ) : (
+        <div 
+          onClick={() => { setIsEditing(true); setEditMinutes(minutes); }}
+          title="Click to manually set time"
+          style={{ fontSize: 44, fontWeight: 700, fontFamily: "'Bebas Neue', sans-serif", letterSpacing: 2, color: fg, cursor: "pointer" }}
+        >
+          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 12 }}>
         <button 
           onClick={toggle}
