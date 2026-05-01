@@ -9,6 +9,14 @@ export default function CodeEditor() {
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [language, setLanguage] = useState("javascript");
+
+  const languages = [
+    { id: "javascript", label: "JavaScript" },
+    { id: "python", label: "Python" },
+    { id: "cpp", label: "C++" },
+    { id: "java", label: "Java" },
+  ];
 
   // Theme-aware styles (Matching Dashboard)
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
@@ -24,12 +32,12 @@ export default function CodeEditor() {
       const response = await fetch("http://localhost:5001/run-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, language }),
       });
       const data = await response.json();
       setOutput(data.output || data.error || "No output returned.");
     } catch (err) {
-      setOutput(`Error: ${err.message}\n(Make sure backend is running on port 5000)`);
+      setOutput(`Error: ${err.message}\n(Make sure backend is running on port 5001)`);
     } finally {
       setLoading(false);
     }
@@ -70,7 +78,29 @@ export default function CodeEditor() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <select 
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              color: fg,
+              border: `1px solid ${border}`,
+              borderRadius: "10px",
+              padding: "8px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: "pointer",
+              outline: "none"
+            }}
+          >
+            {languages.map(lang => (
+              <option key={lang.id} value={lang.id} style={{ background: dark ? "#111" : "#fff", color: fg }}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+
           <button 
             onClick={handleCopy}
             style={{ 
@@ -141,7 +171,7 @@ export default function CodeEditor() {
       }}>
         <Editor
           height="100%"
-          defaultLanguage="javascript"
+          language={language}
           theme={dark ? "vs-dark" : "light"}
           value={code}
           onChange={(val) => setCode(val)}

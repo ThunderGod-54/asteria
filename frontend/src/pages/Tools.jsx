@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import SketchlyCanvas from "sketchly-canvas";
 import CodeEditor from "../components/CodeEditor";
+import Pomodoro from "../components/Pomodoro";
+import MusicPlayer from "../components/MusicPlayer";
+import CalendarTool from "../components/CalendarTool";
+import StretchCanvas from "../components/StretchCanvas";
 import { 
   GraduationCap, Clock, Music, 
   Terminal, Code, PenTool, 
@@ -22,31 +26,7 @@ const Noise = () => (
   </svg>
 );
 
-function SketchlyMount({ containerRef, roomId, username }) {
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const root = createRoot(el);
-    root.render(
-      <SketchlyCanvas
-        serverUrl="http://localhost:5000"
-        roomId={roomId}
-        username={username}
-        asHost={false}
-      />
-    );
-    return () => root.unmount();
-  }, [roomId, username]);
-
-  return null;
-}
-
-export default function Tools({ initialRoomId = null }) {
-  const canvasRef = useRef(null);
-  const [roomInput, setRoomInput] = useState(initialRoomId || "");
-  const [nameInput, setNameInput] = useState("");
-  const [activeRoom, setActiveRoom] = useState(null);
-  const [activeUser, setActiveUser] = useState(null);
+export default function Tools() {
   const [activeCategory, setActiveCategory] = useState("dev");
   const { dark } = useTheme();
 
@@ -54,6 +34,8 @@ export default function Tools({ initialRoomId = null }) {
   const fg = dark ? "#FFFFFF" : "#0A0A0A";
   const fgMuted = dark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.45)";
   const border = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const cardBg = dark ? "rgba(255, 255, 255, 0.03)" : "rgba(0,0,0,0.02)";
+  const cardBorder = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -66,6 +48,19 @@ export default function Tools({ initialRoomId = null }) {
       @keyframes fadeUp {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+
+      .bento-card {
+        background: ${cardBg};
+        border: 1px solid ${cardBorder};
+        border-radius: 24px;
+        padding: 32px;
+        backdrop-filter: blur(20px);
+        transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+      }
+      .bento-card:hover {
+        transform: translateY(-4px);
+        border-color: ${fg};
       }
 
       .dock-item {
@@ -109,16 +104,7 @@ export default function Tools({ initialRoomId = null }) {
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
-  }, [dark, fg, bg, fgMuted]);
-
-  const handleJoin = (e) => {
-    e.preventDefault();
-    const room = roomInput.trim();
-    const name = nameInput.trim();
-    if (!room || !name) return;
-    setActiveRoom(room);
-    setActiveUser(name);
-  };
+  }, [dark, fg, bg, fgMuted, cardBg, cardBorder]);
 
   return (
     <div style={{ background: bg, color: fg, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif", overflowX: "hidden", position: "relative" }}>
@@ -136,110 +122,100 @@ export default function Tools({ initialRoomId = null }) {
           </h1>
         </header>
 
-        {activeRoom ? (
-          <div className="fade-up" style={{ display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, overflow: "hidden", minHeight: "70vh" }}>
-             <div style={{ padding: "16px 24px", borderBottom: `1px solid ${border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontWeight: 700 }}>Canvas: {activeRoom}</div>
-                <button onClick={() => { setActiveRoom(null); setActiveUser(null); }} style={{ background: "transparent", border: `1px solid ${border}`, color: fg, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Exit</button>
-             </div>
-             <div ref={canvasRef} style={{ flex: 1 }}>
-                <SketchlyMount containerRef={canvasRef} roomId={activeRoom} username={activeUser} />
-             </div>
+        <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+          
+          {/* Category Title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, letterSpacing: 1, margin: 0 }}>
+              {activeCategory === 'dev' ? 'DEVELOPER TOOLS' : activeCategory === 'common' ? 'COMMON TOOLS' : 'STUDENT TOOLS'}
+            </h2>
+            <div style={{ flex: 1, height: 1, background: border }} />
           </div>
-        ) : (
-          <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 40 }}>
-            
-            {/* Category Title */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, letterSpacing: 1, margin: 0 }}>
-                {activeCategory === 'dev' ? 'DEVELOPER TOOLS' : activeCategory === 'common' ? 'COMMON TOOLS' : 'STUDENT TOOLS'}
-              </h2>
-              <div style={{ flex: 1, height: 1, background: border }} />
+
+          {/* Dynamic Content */}
+          {activeCategory === 'dev' && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              <CodeEditor />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                <div className="bento-card">
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <Terminal size={18} color={fgMuted} />
+                    <h4 style={{ margin: 0, fontSize: 14 }}>Terminal HUD</h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: fgMuted }}>Live system activity and resource monitoring placeholder.</p>
+                </div>
+                <div className="bento-card">
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <Monitor size={18} color={fgMuted} />
+                    <h4 style={{ margin: 0, fontSize: 14 }}>Code Focus</h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: fgMuted }}>Distraction-free environment for deep coding sessions.</p>
+                </div>
+              </div>
             </div>
+          )}
 
-            {/* Dynamic Content */}
-            {activeCategory === 'dev' && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-                <CodeEditor />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, padding: 24 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                      <Terminal size={18} color={fgMuted} />
-                      <h4 style={{ margin: 0, fontSize: 14 }}>Terminal HUD</h4>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, color: fgMuted }}>Live system activity and resource monitoring placeholder.</p>
-                  </div>
-                  <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, padding: 24 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                      <Monitor size={18} color={fgMuted} />
-                      <h4 style={{ margin: 0, fontSize: 14 }}>Code Focus</h4>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, color: fgMuted }}>Distraction-free environment for deep coding sessions.</p>
-                  </div>
-                </div>
+          {activeCategory === 'common' && (
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "repeat(4, 1fr)", 
+              gridAutoRows: "minmax(200px, auto)",
+              gap: 24 
+            }}>
+              {/* Pomodoro - Small (1x1) */}
+              <div className="bento-card" style={{ gridColumn: "span 1" }}>
+                 <Pomodoro />
               </div>
-            )}
 
-            {activeCategory === 'common' && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
-                <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, padding: 32 }}>
-                   <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                     <PenTool size={22} />
-                   </div>
-                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Sketchly Canvas</h3>
-                   <p style={{ color: fgMuted, fontSize: 14, marginBottom: 24 }}>Collaborative real-time whiteboard for brainstorming.</p>
-                   <form onSubmit={handleJoin} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      <input placeholder="Name" value={nameInput} onChange={e => setNameInput(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${border}`, background: "rgba(255,255,255,0.05)", color: fg }} />
-                      <input placeholder="Room ID" value={roomInput} onChange={e => setRoomInput(e.target.value)} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${border}`, background: "rgba(255,255,255,0.05)", color: fg }} />
-                      <button type="submit" style={{ padding: "12px", borderRadius: "8px", background: fg, color: bg, border: "none", fontWeight: 700, cursor: "pointer" }}>Join Canvas</button>
-                   </form>
-                </div>
-                <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, padding: 32 }}>
-                   <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                     <CalendarIcon size={22} />
-                   </div>
-                   <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Zenith Calendar</h3>
-                   <p style={{ color: fgMuted, fontSize: 14, marginBottom: 24 }}>Schedule your focus blocks and deep work sessions.</p>
-                   <button style={{ padding: "12px", borderRadius: "8px", border: `1px solid ${border}`, background: "transparent", color: fg, fontWeight: 600 }}>Open Calendar</button>
-                </div>
+              {/* Music Player - Small (1x1) */}
+              <div className="bento-card" style={{ gridColumn: "span 1" }}>
+                 <MusicPlayer />
               </div>
-            )}
 
-            {activeCategory === 'student' && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
-                {['Pomodoro Timer', 'Focus Music', 'Study Planner'].map((t, i) => (
-                  <div key={t} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 24, padding: 32 }}>
-                    <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{t}</h3>
-                    <p style={{ color: fgMuted, fontSize: 14 }}>Essential tool for academic focus and session management.</p>
-                  </div>
-                ))}
+              {/* Calendar - Large (2x2) */}
+              <div className="bento-card" style={{ gridColumn: "span 2", gridRow: "span 2" }}>
+                 <CalendarTool />
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Stretch Canvas - Medium (2x1) */}
+              <div className="bento-card" style={{ gridColumn: "span 2" }}>
+                 <StretchCanvas />
+              </div>
+            </div>
+          )}
+
+          {activeCategory === 'student' && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
+              {['Study Planner', 'Resource Hub', 'Note Taker'].map((t, i) => (
+                <div key={t} className="bento-card">
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{t}</h3>
+                  <p style={{ color: fgMuted, fontSize: 14 }}>Essential tool for academic focus and session management.</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
       </main>
 
       {/* DOCK */}
-      {!activeRoom && (
-        <div style={{
-          position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)",
-          zIndex: 1000, display: "flex", gap: 12, padding: "12px", borderRadius: "24px",
-          background: dark ? "rgba(20,20,20,0.8)" : "rgba(255,255,255,0.8)",
-          backdropFilter: "blur(20px)", border: `1px solid ${border}`,
-          boxShadow: `0 20px 50px rgba(0,0,0,${dark ? 0.5 : 0.1})`
-        }}>
-          <div className={`dock-item ${activeCategory === 'dev' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('dev')} onClick={() => setActiveCategory('dev')}>
-            <Terminal size={24} /><div className="dock-label">DEVELOPER</div>
-          </div>
-          <div className={`dock-item ${activeCategory === 'common' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('common')} onClick={() => setActiveCategory('common')}>
-            <Layout size={24} /><div className="dock-label">COMMON</div>
-          </div>
-          <div className={`dock-item ${activeCategory === 'student' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('student')} onClick={() => setActiveCategory('student')}>
-            <GraduationCap size={24} /><div className="dock-label">STUDENT</div>
-          </div>
+      <div style={{
+        position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)",
+        zIndex: 1000, display: "flex", gap: 12, padding: "12px", borderRadius: "24px",
+        background: dark ? "rgba(20,20,20,0.8)" : "rgba(255,255,255,0.8)",
+        backdropFilter: "blur(20px)", border: `1px solid ${border}`,
+        boxShadow: `0 20px 50px rgba(0,0,0,${dark ? 0.5 : 0.1})`
+      }}>
+        <div className={`dock-item ${activeCategory === 'dev' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('dev')} onClick={() => setActiveCategory('dev')}>
+          <Terminal size={24} /><div className="dock-label">DEVELOPER</div>
         </div>
-      )}
+        <div className={`dock-item ${activeCategory === 'common' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('common')} onClick={() => setActiveCategory('common')}>
+          <Layout size={24} /><div className="dock-label">COMMON</div>
+        </div>
+        <div className={`dock-item ${activeCategory === 'student' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('student')} onClick={() => setActiveCategory('student')}>
+          <GraduationCap size={24} /><div className="dock-label">STUDENT</div>
+        </div>
+      </div>
     </div>
   );
 }

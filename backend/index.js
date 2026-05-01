@@ -59,24 +59,71 @@ app.get("/api/face", (req, res) => {
 });
 
 app.post("/run-code", (req, res) => {
-  const { code } = req.body;
+  const { code, language } = req.body;
   const vm = require("vm");
   const util = require("util");
+  const fs = require("fs");
+  const path = require("path");
+  const { exec } = require("child_process");
   
-  let output = "";
-  const customConsole = {
-    log: (...args) => { output += args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
-    error: (...args) => { output += "ERROR: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
-    warn: (...args) => { output += "WARN: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; }
-  };
+  if (language === "javascript") {
+    let output = "";
+    const customConsole = {
+      log: (...args) => { output += args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
+      error: (...args) => { output += "ERROR: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; },
+      warn: (...args) => { output += "WARN: " + args.map(arg => util.inspect(arg)).join(" ") + "\n"; }
+    };
 
-  try {
-    const script = new vm.Script(code);
-    const context = vm.createContext({ console: customConsole, ...global });
-    script.runInContext(context, { timeout: 1000 });
-    res.json({ output: output || "Code executed successfully (no output)." });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    try {
+      const script = new vm.Script(code);
+      const context = vm.createContext({ console: customConsole, ...global });
+      script.runInContext(context, { timeout: 1000 });
+      res.json({ output: output || "Code executed successfully (no output)." });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  } else {
+    // Handle other languages via system exec
+    const fileId = uuidv4();
+    const tempDir = path.join(__dirname, "temp");
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    let fileName, execCmd;
+    if (language === "python") {
+      fileName = `${fileId}.py`;
+      execCmd = `python ${path.join(tempDir, fileName)}`;
+    } else if (language === "cpp") {
+      fileName = `${fileId}.cpp`;
+      const outName = `${fileId}.exe`;
+      execCmd = `g++ ${path.join(tempDir, fileName)} -o ${path.join(tempDir, outName)} && ${path.join(tempDir, outName)}`;
+    } else if (language === "java") {
+      fileName = `Main_${fileId.replace(/-/g, "")}.java`;
+      // Java requires class name to match file name
+      const className = fileName.replace(".java", "");
+      const adjustedCode = code.replace(/public\s+class\s+\w+/, `public class ${className}`);
+      fs.writeFileSync(path.join(tempDir, fileName), adjustedCode);
+      execCmd = `javac ${path.join(tempDir, fileName)} && java -cp ${tempDir} ${className}`;
+    }
+
+    if (!fileName) return res.status(400).json({ error: "Unsupported language" });
+
+    if (language !== "java") {
+      fs.writeFileSync(path.join(tempDir, fileName), code);
+    }
+
+    exec(execCmd, (err, stdout, stderr) => {
+      // Cleanup
+      try {
+        if (fs.existsSync(path.join(tempDir, fileName))) fs.unlinkSync(path.join(tempDir, fileName));
+        if (language === "cpp" && fs.existsSync(path.join(tempDir, `${fileId}.exe`))) fs.unlinkSync(path.join(tempDir, `${fileId}.exe`));
+      } catch (e) {}
+
+      if (err) {
+        res.status(400).json({ error: stderr || err.message });
+      } else {
+        res.json({ output: stdout || "Code executed successfully (no output)." });
+      }
+    });
   }
 });
 
