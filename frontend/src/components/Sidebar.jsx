@@ -75,7 +75,7 @@ export default function Sidebar() {
   const links = [
     { to: "/dashboard", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
     { to: "/face", icon: <ScanFace size={20} />, label: "Face Tracking" },
-    { to: "/tracker", icon: <ActivitySquare size={20} />, label: "App Tracker" },
+    { to: "/tracker", icon: <ActivitySquare size={20} />, label: "Focus Metrics" },
     { to: "/ai", icon: <Bot size={20} />, label: "AI Insights" },
     { to: "/tools", icon: <Wrench size={20} />, label: "Tools" },
   ];
