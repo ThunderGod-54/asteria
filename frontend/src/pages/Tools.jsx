@@ -137,13 +137,16 @@ export default function Tools({ initialRoomId }) {
       }
       .dock-item:hover .dock-label {
         opacity: 1;
-        transform: translate(-50%, -40px);
+        transform: translate(-50%, 40px);
+      }
+      .dock-item:active {
+        transform: translateY(10px) scale(0.95);
       }
       .dock-label {
         position: absolute;
-        bottom: 0;
+        top: 0;
         left: 50%;
-        transform: translate(-50%, -20px);
+        transform: translate(-50%, 20px);
         opacity: 0;
         transition: all 0.3s;
         background: ${fg};
@@ -284,19 +287,19 @@ export default function Tools({ initialRoomId }) {
 
       {/* DOCK */}
       <div style={{
-        position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)",
+        position: "fixed", top: 48, left: "50%", transform: "translateX(-50%)",
         zIndex: 1000, display: "flex", gap: 12, padding: "12px", borderRadius: "24px",
         background: dark ? "rgba(20,20,20,0.8)" : "rgba(255,255,255,0.8)",
         backdropFilter: "blur(20px)", border: `1px solid ${border}`,
         boxShadow: `0 20px 50px rgba(0,0,0,${dark ? 0.5 : 0.1})`
       }}>
-        <div className={`dock-item ${activeCategory === 'dev' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('dev')} onClick={() => setActiveCategory('dev')}>
+        <div className={`dock-item ${activeCategory === 'dev' ? 'active' : ''}`} onClick={() => setActiveCategory('dev')}>
           <Terminal size={24} /><div className="dock-label">DEVELOPER</div>
         </div>
-        <div className={`dock-item ${activeCategory === 'common' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('common')} onClick={() => setActiveCategory('common')}>
+        <div className={`dock-item ${activeCategory === 'common' ? 'active' : ''}`} onClick={() => setActiveCategory('common')}>
           <Layout size={24} /><div className="dock-label">COMMON</div>
         </div>
-        <div className={`dock-item ${activeCategory === 'student' ? 'active' : ''}`} onMouseEnter={() => setActiveCategory('student')} onClick={() => setActiveCategory('student')}>
+        <div className={`dock-item ${activeCategory === 'student' ? 'active' : ''}`} onClick={() => setActiveCategory('student')}>
           <GraduationCap size={24} /><div className="dock-label">STUDENT</div>
         </div>
       </div>
