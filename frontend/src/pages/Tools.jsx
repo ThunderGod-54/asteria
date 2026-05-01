@@ -13,6 +13,7 @@ import {
   Sparkles, ArrowRight, ChevronRight,
   Monitor, Layout, Briefcase,
   Layers, Zap, Cpu, BookOpen, Laptop, Globe,
+  Sun, Moon,
   Calendar as CalendarIcon
 } from "lucide-react";
 import { useTheme } from "../Theme";
@@ -50,7 +51,7 @@ function IsolatedCanvas({ roomId, serverUrl }) {
       containerRef.current.appendChild(el);
       rootRef.current = createRoot(el);
       rootRef.current.render(
-        <SketchlyCanvas serverUrl={serverUrl} roomId={roomId} asHost={true} />
+        <SketchlyCanvas serverUrl={serverUrl} roomId={roomId} asHost={true} showThemeToggle={false} />
       );
     }
 
@@ -67,7 +68,7 @@ function IsolatedCanvas({ roomId, serverUrl }) {
 
 export default function Tools({ initialRoomId }) {
   const [activeCategory, setActiveCategory] = useState("dev");
-  const { dark } = useTheme();
+  const { dark, setDark } = useTheme();
 
   // Stable room ID — generate once, persist in sessionStorage so refreshes keep the same room
   const canvasRoomId = useMemo(() => {
@@ -163,13 +164,37 @@ export default function Tools({ initialRoomId }) {
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px 120px", position: "relative", zIndex: 1 }}>
         
         {/* HEADER */}
-        <header className="fade-up" style={{ marginBottom: 40 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: fgMuted, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8, textTransform: "uppercase" }}>
-            <Cpu size={14} /> UTILITY STACK
+        <header className="fade-up" style={{ marginBottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: fgMuted, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, marginBottom: 8, textTransform: "uppercase" }}>
+              <Cpu size={14} /> UTILITY STACK
+            </div>
+            <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, letterSpacing: 1, margin: 0 }}>
+              ZENITH <span style={{ WebkitTextStroke: `1px ${fg}`, color: "transparent" }}>TOOLS</span>
+            </h1>
           </div>
-          <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, letterSpacing: 1, margin: 0 }}>
-            ZENITH <span style={{ WebkitTextStroke: `1px ${fg}`, color: "transparent" }}>TOOLS</span>
-          </h1>
+
+          <button 
+            onClick={() => setDark(!dark)}
+            style={{
+              background: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+              border: `1px solid ${border}`,
+              color: fg,
+              borderRadius: 12,
+              padding: "10px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              transition: "all 0.3s",
+              fontFamily: "inherit"
+            }}
+          >
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
+            <span>{dark ? "Light Mode" : "Dark Mode"}</span>
+          </button>
         </header>
 
         <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 40 }}>
